@@ -106,7 +106,7 @@ struct AlertEngineTests {
         AppGroup(
             id: name, kind: kind, displayName: name, bundlePath: nil, processCount: 3,
             footprint: UInt64(gbs * Double(gb)), cpuPercent: cpu, cwdFolder: kind == .cli ? "web" : nil,
-            ports: kind == .cli ? [3110] : [], pids: [10, 11], subgroups: [], isTerminable: terminable
+            ports: kind == .cli ? [3110] : [], pids: [10, 11], subgroups: [], terminablePids: terminable ? [10, 11] : []
         )
     }
 
@@ -122,6 +122,8 @@ struct AlertEngineTests {
         #expect(message.body == "Aside 20.7 GB · ego lite 3.9 GB · Claude 1.8 GB")
         #expect(message.targets.map(\.name) == ["Aside", "ego lite", "Claude"])
         #expect(message.targets[0].ids.map(\.pid) == [10, 11])
+        #expect(message.targets[0].groupID == "Aside")
+        #expect(message.playsSound)
 
         let available = AlertMessages.memory(
             cause: .availableMemory, swapBytes: 0, availablePercent: 18, groups: groups, identities: fakeIdentities)
@@ -141,13 +143,14 @@ struct AlertEngineTests {
         #expect(message.title == "[주의] CPU 급증 — next-server 340%")
         #expect(message.body == "web · :3110 · 3개 · 35초째")
         #expect(message.targets.map(\.name) == ["next-server"])
+        #expect(!message.playsSound)
         #expect(AlertMessages.cpu(group: group("App", gbs: 1, cpu: 400), seconds: 33, identities: fakeIdentities).body == "프로세스 3개 · 33초째")
         #expect(AlertMessages.duration(seconds: 59) == "59초")
         #expect(AlertMessages.duration(seconds: 605) == "10분")
     }
 
     @Test func killTargetsRoundTripThroughJSON() throws {
-        let targets = [KillTarget(name: "Aside", ids: [ProcessIdentity(pid: 1, startSeconds: 2, startMicroseconds: 3)])]
+        let targets = [KillTarget(groupID: "/Applications/Aside.app", name: "Aside", ids: [ProcessIdentity(pid: 1, startSeconds: 2, startMicroseconds: 3)])]
         let data = try JSONEncoder().encode(targets)
         #expect(try JSONDecoder().decode([KillTarget].self, from: data) == targets)
     }

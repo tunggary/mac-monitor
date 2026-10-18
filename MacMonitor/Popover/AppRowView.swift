@@ -39,7 +39,7 @@ struct AppRowView: View {
         VStack(spacing: 0) {
             RowHeader(group: group, dot: dot, sort: model.sort, expanded: true, onToggle: toggle, onKill: killGroup)
             ForEach(group.subgroups) { sub in
-                SubRowView(sort: model.sort, sub: sub, canKill: group.isTerminable) {
+                SubRowView(sort: model.sort, sub: sub, canKill: sub.isTerminable) {
                     model.kill.terminate(
                         key: KillCoordinator.subKey(group.id, sub.id), groupID: group.id, name: sub.name, pids: sub.pids
                     )
@@ -66,7 +66,7 @@ struct AppRowView: View {
     }
 
     private func killGroup() {
-        model.kill.terminate(key: groupKey, groupID: group.id, name: group.displayName, pids: group.pids)
+        model.kill.terminate(key: groupKey, groupID: group.id, name: group.displayName, pids: group.terminablePids)
     }
 }
 

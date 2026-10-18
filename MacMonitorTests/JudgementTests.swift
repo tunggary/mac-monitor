@@ -54,7 +54,7 @@ struct JudgementTests {
         AppGroup(
             id: id, kind: .app, displayName: id, bundlePath: nil, processCount: 1,
             footprint: footprintGB * gb, cpuPercent: cpu, cwdFolder: nil, ports: [], pids: [1],
-            subgroups: [], isTerminable: true
+            subgroups: [], terminablePids: [1]
         )
     }
 

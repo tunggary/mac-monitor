@@ -5,7 +5,7 @@ struct RowTextTests {
     private func group(kind: GroupKind, count: Int, cwd: String? = nil, ports: [UInt16] = [], cpu: Double = 0) -> AppGroup {
         AppGroup(
             id: "g", kind: kind, displayName: "g", bundlePath: nil, processCount: count, footprint: 0, cpuPercent: cpu,
-            cwdFolder: cwd, ports: ports, pids: [], subgroups: [], isTerminable: true
+            cwdFolder: cwd, ports: ports, pids: [], subgroups: [], terminablePids: [1]
         )
     }
 
@@ -25,8 +25,8 @@ struct RowTextTests {
     }
 
     @Test func subRowDetail() {
-        let normal = SubGroup(id: "a", name: "a", processCount: 96, footprint: 0, cpuPercent: 0, pids: [], isOthers: false, othersHint: nil)
-        let others = SubGroup(id: "others", name: "그 외 12개", processCount: 12, footprint: 0, cpuPercent: 0, pids: [], isOthers: true, othersHint: "Helper (GPU) 외")
+        let normal = SubGroup(id: "a", name: "a", processCount: 96, footprint: 0, cpuPercent: 0, pids: [], isOthers: false, isTerminable: true, othersHint: nil)
+        let others = SubGroup(id: "others", name: "그 외 12개", processCount: 12, footprint: 0, cpuPercent: 0, pids: [], isOthers: true, isTerminable: true, othersHint: "Helper (GPU) 외")
         #expect(RowText.detail(sub: normal) == "96개")
         #expect(RowText.detail(sub: others) == "Helper (GPU) 외")
     }
@@ -48,5 +48,22 @@ struct RowTextTests {
         #expect(NumberInput.positive("") == nil)
         #expect(NumberInput.positive("0") == nil)
         #expect(NumberInput.positive("4.5") == 4.5)
+    }
+
+    @Test func swapThresholdsMustBeOrdered() {
+        #expect(SettingsValidation.swapCaution(4, danger: 8) == nil)
+        #expect(SettingsValidation.swapCaution(8, danger: 8) == "주의는 위험보다 작아야 해요")
+        #expect(SettingsValidation.swapCaution(9, danger: 8) != nil)
+        #expect(SettingsValidation.swapDanger(8, caution: 4) == nil)
+        #expect(SettingsValidation.swapDanger(4, caution: 4) != nil)
+        #expect(SettingsValidation.swapDanger(3, caution: 4) != nil)
+    }
+
+    @Test func availablePercentIsIntegerOneToNinetyNine() {
+        #expect(SettingsValidation.availablePercent(1) == nil)
+        #expect(SettingsValidation.availablePercent(99) == nil)
+        #expect(SettingsValidation.availablePercent(0) == "1~99 사이로 입력해 주세요")
+        #expect(SettingsValidation.availablePercent(100) != nil)
+        #expect(SettingsValidation.availablePercent(20.5) != nil)
     }
 }

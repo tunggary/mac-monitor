@@ -17,6 +17,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusController = status
 
         alertCenter.onOpenPopover = { status.showPopover() }
+        alertCenter.onKill = { [model] target in model.terminateFromAlert(target) }
+        model.onForceKillPrompt = { status.showPopover() }
         model.onAlert = { [alertCenter] message in alertCenter.post(message) }
         if !underTest {
             alertCenter.start()

@@ -48,6 +48,8 @@ final class AppModel {
     @ObservationIgnored var onUpdate: (() -> Void)?
     /// 보낼 알림이 생겼을 때
     @ObservationIgnored var onAlert: ((AlertMessage) -> Void)?
+    /// 알림 버튼으로 종료했는데 3초 뒤에도 살아 있을 때 (팝오버를 열려고)
+    @ObservationIgnored var onForceKillPrompt: (() -> Void)?
     @ObservationIgnored private var alertEngine = AlertEngine()
 
     var dangerCause: DangerCause? {
@@ -87,7 +89,11 @@ final class AppModel {
 
     func start() {
         guard tasks.isEmpty else { return }
-        kill.onConfirmShown = { [weak self] groupID in self?.expandedID = groupID }
+        kill.onConfirmShown = { [weak self] groupID in
+            self?.expandedID = groupID
+            self?.onForceKillPrompt?()
+        }
+        kill.groupExists = { [weak self] groupID in self?.groups.contains { $0.id == groupID } ?? false }
         tasks.append(Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(1), tolerance: .milliseconds(200))
@@ -102,6 +108,11 @@ final class AppModel {
                 try? await Task.sleep(for: .seconds(3), tolerance: .milliseconds(500))
             }
         })
+    }
+
+    /// 알림의 종료 버튼: 알림 시점의 신원에 SIGTERM, 3초 뒤 생존자가 있으면 팝오버의 강제종료 확인 박스(팝오버 내 종료와 같은 상태)
+    func terminateFromAlert(_ target: KillTarget) {
+        kill.terminate(key: KillCoordinator.groupKey(target.groupID), groupID: target.groupID, name: target.name, targets: target.ids)
     }
 
     private func sampleSystem() {
