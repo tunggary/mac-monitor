@@ -36,7 +36,7 @@ enum Judgement {
     }
 
     /// 행 상태 점. 원인 순위 = 메모리 footprint 큰 순 (표시 정렬과 무관).
-    /// 위험: 1위 코랄 / 주의·위험: 2·3위 또는 CPU ≥ 기준 노랑 / 나머지 초록
+    /// 위험: 1위 코랄, 2·3위 노랑 / 주의: 1~3위 노랑 / CPU ≥ 기준 앱은 메모리 상태와 무관하게 노랑(코랄이 우선) / 나머지 초록
     static func rowDots(groups: [AppGroup], level: MemoryLevel, settings: Settings) -> [String: RowDot] {
         let ranked = groups.enumerated()
             .sorted { ($0.element.footprint, $1.offset) > ($1.element.footprint, $0.offset) }
@@ -46,13 +46,33 @@ enum Judgement {
             let rank = index + 1
             if level == .danger, rank == 1 {
                 dots[group.id] = .danger
-            } else if level != .normal, (rank == 2 || rank == 3 || group.cpuPercent >= settings.appCPUCautionPercent) {
+            } else if (level == .danger && rank <= 3) || (level == .caution && rank <= 3)
+                        || group.cpuPercent >= settings.appCPUCautionPercent {
                 dots[group.id] = .warn
             } else {
                 dots[group.id] = .ok
             }
         }
         return dots
+    }
+
+    /// 배너·알림 제목의 원인 문구: "스왑 12.7 GB" / "사용 가능 18%"
+    static func causeTitle(cause: DangerCause, swapBytes: UInt64, availablePercent: Double) -> String {
+        switch cause {
+        case .swap: "스왑 \(Format.gb(swapBytes))"
+        case .availableMemory: "사용 가능 \(Format.wholePercent(availablePercent))"
+        }
+    }
+
+    /// 배너 본문. 스왑: "경고 기준 8 GB를 4분째 넘고 있어요." / 사용 가능: "경고 기준 20%보다 4분째 적어요." + 가장 큰 원인.
+    static func bannerBody(cause: DangerCause, settings: Settings, minutes: Int, top: (name: String, footprint: UInt64)?) -> String {
+        var text: String
+        switch cause {
+        case .swap: text = "경고 기준 \(Format.thresholdGB(settings.swapDangerGB))를 \(minutes)분째 넘고 있어요."
+        case .availableMemory: text = "경고 기준 \(Format.wholePercent(settings.availableDangerPercent))보다 \(minutes)분째 적어요."
+        }
+        if let top { text += " 가장 큰 원인은 \(top.name)(\(Format.memory(top.footprint)))예요." }
+        return text
     }
 
     /// 배너 "N분째". 막 시작해도 최소 1분으로 표기한다.
@@ -67,6 +87,15 @@ enum Judgement {
     }
 }
 
+/// 한국어 조사
+enum Korean {
+    /// 목적격 조사. 마지막 글자가 받침 있는 한글이면 "을", 그 외(받침 없는 한글·영문·숫자·기호)는 "를".
+    static func objectParticle(for name: String) -> String {
+        guard let last = name.unicodeScalars.last, (0xAC00...0xD7A3).contains(last.value) else { return "를" }
+        return (last.value - 0xAC00) % 28 == 0 ? "를" : "을"
+    }
+}
+
 /// 숫자 표시 (1024 기준 값에 "GB" 라벨 — 활성 상태 보기와 같다)
 enum Format {
     static func gb(_ bytes: UInt64) -> String { gb(Double(bytes)) }
@@ -77,6 +106,11 @@ enum Format {
         let value = Double(bytes)
         if value >= Settings.bytesPerGB { return gb(value) }
         return String(format: "%.0f MB", value / 1_048_576)
+    }
+
+    /// 입력칸 표시: 4 → "4", 4.5 → "4.5"
+    static func number(_ value: Double) -> String {
+        value == value.rounded() ? String(format: "%.0f", value) : String(value)
     }
 
     static func percent(_ value: Double) -> String { String(format: "%.1f%%", value) }

@@ -77,19 +77,43 @@ struct JudgementTests {
         #expect(dots["e"] == .ok)
     }
 
-    @Test func rowDotsCautionHasNoCoral() {
+    @Test func rowDotsDangerCoralBeatsCPUYellow() {
+        let groups = [group("a", footprintGB: 20, cpu: 500), group("b", footprintGB: 1)]
+        #expect(Judgement.rowDots(groups: groups, level: .danger, settings: settings)["a"] == .danger)
+    }
+
+    @Test func rowDotsCautionTopThreeAreYellow() {
         let groups = [group("a", footprintGB: 5), group("b", footprintGB: 4), group("c", footprintGB: 3), group("d", footprintGB: 2)]
         let dots = Judgement.rowDots(groups: groups, level: .caution, settings: settings)
         #expect(!dots.values.contains(.danger))
+        #expect(dots["a"] == .warn)
         #expect(dots["b"] == .warn)
         #expect(dots["c"] == .warn)
         #expect(dots["d"] == .ok)
     }
 
-    @Test func rowDotsNormalAreAllGreen() {
-        let groups = [group("a", footprintGB: 5, cpu: 400), group("b", footprintGB: 4)]
+    @Test func rowDotsNormalOnlyHighCPUIsYellow() {
+        let groups = [group("a", footprintGB: 5, cpu: 400), group("b", footprintGB: 4), group("c", footprintGB: 3, cpu: 299)]
         let dots = Judgement.rowDots(groups: groups, level: .normal, settings: settings)
-        #expect(dots.values.allSatisfy { $0 == .ok })
+        #expect(dots["a"] == .warn)
+        #expect(dots["b"] == .ok)
+        #expect(dots["c"] == .ok)
+    }
+
+    @Test func bannerTextForSwapAndAvailableMemory() {
+        let top = (name: "Aside", footprint: UInt64(20.7 * Double(gb)))
+        #expect(Judgement.causeTitle(cause: .swap, swapBytes: UInt64(12.7 * Double(gb)), availablePercent: 40) == "스왑 12.7 GB")
+        #expect(Judgement.causeTitle(cause: .availableMemory, swapBytes: 0, availablePercent: 18) == "사용 가능 18%")
+        #expect(Judgement.bannerBody(cause: .swap, settings: settings, minutes: 4, top: top)
+            == "경고 기준 8 GB를 4분째 넘고 있어요. 가장 큰 원인은 Aside(20.7 GB)예요.")
+        #expect(Judgement.bannerBody(cause: .availableMemory, settings: settings, minutes: 4, top: top)
+            == "경고 기준 20%보다 4분째 적어요. 가장 큰 원인은 Aside(20.7 GB)예요.")
+        #expect(Judgement.bannerBody(cause: .swap, settings: settings, minutes: 1, top: nil) == "경고 기준 8 GB를 1분째 넘고 있어요.")
+    }
+
+    @Test func bothCausesPreferSwapWording() {
+        let cause = Judgement.dangerCause(swapBytes: UInt64(12 * Double(gb)), availablePercent: 10, settings: settings)
+        #expect(cause == .swap)
     }
 
     @Test func dangerMinutes() {

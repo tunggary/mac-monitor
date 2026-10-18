@@ -27,6 +27,7 @@ private final class FrameView: NSView {
 @MainActor
 final class StatusItemController: NSObject, NSPopoverDelegate {
     private let model: AppModel
+    private let openSettings: () -> Void
     private let character: any Character
     private let statusItem: NSStatusItem
     private let popover = NSPopover()
@@ -37,8 +38,9 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     /// 상태별 CGImage 캐시 (NSImage → CGImage 변환은 시작 후 한 번만)
     private var cgFrames: [MemoryLevel: [CGImage]] = [:]
 
-    init(model: AppModel, character: any Character) {
+    init(model: AppModel, character: any Character, openSettings: @escaping () -> Void) {
         self.model = model
+        self.openSettings = openSettings
         self.character = character
         statusItem = NSStatusBar.system.statusItem(withLength: 30)
         super.init()
@@ -111,10 +113,18 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     @objc private func togglePopover() {
         if popover.isShown {
             popover.performClose(nil)
-            return
+        } else {
+            showPopover()
         }
-        guard let button = statusItem.button else { return }
-        let controller = NSHostingController(rootView: PopoverView(model: model))
+    }
+
+    /// 알림 클릭 등 밖에서도 팝오버를 열 수 있게 한다.
+    func showPopover() {
+        guard !popover.isShown, let button = statusItem.button else { return }
+        let controller = NSHostingController(rootView: PopoverView(model: model, openSettings: { [weak self] in
+            self?.popover.performClose(nil)
+            self?.openSettings()
+        }))
         controller.sizingOptions = [.preferredContentSize]
         popover.contentViewController = controller
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
