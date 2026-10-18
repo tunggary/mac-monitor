@@ -67,6 +67,8 @@ final class KillCoordinator {
     @ObservationIgnored private let grace: Duration
     /// 확인 박스가 뜰 때 (그 행을 펼치려고)
     @ObservationIgnored var onConfirmShown: ((_ groupID: String) -> Void)?
+    /// 그 그룹이 지금 목록에 있는가. 유예 뒤 그룹이 사라졌으면 확인 박스 없이 끝낸다.
+    @ObservationIgnored var groupExists: (_ groupID: String) -> Bool = { _ in true }
 
     init(grace: Duration = .seconds(3)) { self.grace = grace }
 
@@ -75,7 +77,11 @@ final class KillCoordinator {
 
     /// 즉시 SIGTERM 을 보내고, 유예 뒤 생존 여부를 확인한다.
     func terminate(key: String, groupID: String, name: String, pids: [Int32]) {
-        let targets = ProcessKiller.identities(of: pids)
+        terminate(key: key, groupID: groupID, name: name, targets: ProcessKiller.identities(of: pids))
+    }
+
+    /// 이미 신원을 붙인 대상(알림 시점의 pid + 시작시간)에게 SIGTERM. pid 가 재사용됐으면 신호가 가지 않는다.
+    func terminate(key: String, groupID: String, name: String, targets: [ProcessIdentity]) {
         ProcessKiller.terminate(targets)
         entries[key] = Entry(groupID: groupID, name: name, targets: targets)
         tasks[key]?.cancel()
@@ -90,7 +96,7 @@ final class KillCoordinator {
         guard var entry = entries[key] else { return }
         entry.survivors = ProcessKiller.alive(entry.targets)
         tasks[key] = nil
-        if entry.survivors.isEmpty {
+        if entry.survivors.isEmpty || !groupExists(entry.groupID) {
             entries[key] = nil
         } else {
             entries[key] = entry

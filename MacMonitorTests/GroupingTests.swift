@@ -102,17 +102,42 @@ struct GroupingTests {
         #expect(byName["node"]?.isTerminable == true)
     }
 
-    @Test func groupWithMixedUidIsNotTerminable() {
+    @Test func mixedUidGroupKillsOnlyMyProcesses() {
         let samples = [
-            ProcessSample(pid: 1, name: "Aside", path: aside),
-            ProcessSample(pid: 2, uid: 0, name: "Aside Helper", path: asideHelper),
+            ProcessSample(pid: 1, name: "Aside", path: aside, footprint: 300 * mb),
+            ProcessSample(pid: 2, uid: 0, name: "Aside Helper", path: asideHelper, footprint: 200 * mb),
+            ProcessSample(pid: 3, name: "Aside Helper (Renderer)", path: asideHelper, footprint: 100 * mb),
         ]
-        #expect(group(samples)[0].isTerminable == false)
+        let g = group(samples)[0]
+        #expect(g.isTerminable)
+        #expect(g.terminablePids == [1, 3])
+        let byName = Dictionary(uniqueKeysWithValues: g.subgroups.map { ($0.name, $0) })
+        #expect(byName["Aside"]?.isTerminable == true)
+        #expect(byName["Aside Helper"]?.isTerminable == false)
+        #expect(byName["Aside Helper (Renderer)"]?.isTerminable == true)
+    }
+
+    @Test func groupWithOnlyOtherUidHasNoTerminablePids() {
+        let samples = [ProcessSample(pid: 2, uid: 0, name: "Aside Helper", path: asideHelper)]
+        let g = group(samples)[0]
+        #expect(!g.isTerminable)
+        #expect(g.terminablePids.isEmpty)
+    }
+
+    @Test func subgroupWithSelfPidIsNotTerminable() {
+        let samples = [
+            ProcessSample(pid: selfPid, name: "mac-monitor", path: "/Applications/mac-monitor.app/Contents/MacOS/mac-monitor"),
+            ProcessSample(pid: 7, name: "helper", path: "/Applications/mac-monitor.app/Contents/Helpers/helper"),
+        ]
+        let g = group(samples)[0]
+        #expect(g.terminablePids == [7])
+        #expect(g.subgroups.first { $0.name == "mac-monitor" }?.isTerminable == false)
     }
 
     @Test func selfIsNotTerminable() {
         let samples = [ProcessSample(pid: selfPid, name: "mac-monitor", path: "/Applications/mac-monitor.app/Contents/MacOS/mac-monitor")]
         #expect(group(samples)[0].isTerminable == false)
+        #expect(group(samples)[0].subgroups[0].isTerminable == false)
     }
 
     @Test func subgroupsTopThreePlusOthers() {

@@ -34,6 +34,8 @@ final class AlertCenter {
     private var categories: [UNNotificationCategory] = []
     /// 알림 본문(기본 액션) 클릭 → 팝오버 열기
     var onOpenPopover: (() -> Void)?
+    /// 알림의 "OO 종료" 버튼
+    var onKill: ((KillTarget) -> Void)?
 
     func start() {
         let delegate = NotificationDelegate { [weak self] actionID, json in
@@ -42,7 +44,7 @@ final class AlertCenter {
         self.delegate = delegate
         center.delegate = delegate
         Task { [center] in
-            _ = try? await center.requestAuthorization(options: [.alert])
+            _ = try? await center.requestAuthorization(options: [.alert, .sound])
         }
     }
 
@@ -50,6 +52,7 @@ final class AlertCenter {
         let content = UNMutableNotificationContent()
         content.title = message.title
         content.body = message.body
+        if message.playsSound { content.sound = .default }
         if let data = try? JSONEncoder().encode(message.targets), let json = String(data: data, encoding: .utf8) {
             content.userInfo = [Self.targetsKey: json]
         }
@@ -73,8 +76,7 @@ final class AlertCenter {
                   let data = targetsJSON?.data(using: .utf8),
                   let targets = try? JSONDecoder().decode([KillTarget].self, from: data),
                   targets.indices.contains(index) {
-            // 알림 시점의 pid 이므로 신원(시작시간)이 같을 때만 SIGTERM
-            ProcessKiller.terminate(targets[index].ids)
+            onKill?(targets[index])
         }
     }
 }

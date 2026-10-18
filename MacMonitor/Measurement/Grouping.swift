@@ -18,6 +18,8 @@ struct SubGroup: Sendable, Equatable, Identifiable {
     var cpuPercent: Double
     var pids: [Int32]
     var isOthers: Bool
+    /// 이 줄의 pid 가 전부 종료 가능(내 계정, 이 앱 자신 제외)일 때만 true
+    var isTerminable: Bool
     /// "그 외" 줄의 부가정보 (예: "Helper (GPU) 외")
     var othersHint: String?
 }
@@ -35,8 +37,9 @@ struct AppGroup: Sendable, Equatable, Identifiable {
     var ports: [UInt16]
     var pids: [Int32]
     var subgroups: [SubGroup]
-    /// 그룹 내 모든 pid 의 uid == 현재 uid 이고 이 앱 자신이 없을 때만 true
-    var isTerminable: Bool
+    /// 종료 신호를 보낼 수 있는 pid (내 계정, 이 앱 자신 제외). 섞인 그룹이면 일부만 들어 있다.
+    var terminablePids: [Int32]
+    var isTerminable: Bool { !terminablePids.isEmpty }
 }
 
 enum Grouping {
@@ -91,6 +94,10 @@ enum Grouping {
         return last.isEmpty ? nil : last
     }
 
+    static func isTerminable(_ sample: ProcessSample, selfPid: Int32, currentUID: UInt32) -> Bool {
+        sample.uid == currentUID && sample.pid != selfPid
+    }
+
     /// 순수 함수: 샘플 배열 → footprint 큰 순으로 정렬된 그룹 배열.
     static func group(_ samples: [ProcessSample], selfPid: Int32, currentUID: UInt32) -> [AppGroup] {
         let byPid = Dictionary(samples.map { ($0.pid, $0) }, uniquingKeysWith: { first, _ in first })
@@ -141,8 +148,8 @@ enum Grouping {
                 cwdFolder: draft.cwdFolder,
                 ports: Array(Set(members.flatMap(\.listenPorts))).sorted(),
                 pids: members.map(\.pid).sorted(),
-                subgroups: subgroups(of: members),
-                isTerminable: members.allSatisfy { $0.uid == currentUID && $0.pid != selfPid }
+                subgroups: subgroups(of: members, selfPid: selfPid, currentUID: currentUID),
+                terminablePids: members.filter { isTerminable($0, selfPid: selfPid, currentUID: currentUID) }.map(\.pid).sorted()
             )
         }
         .sorted { ($0.footprint, $1.displayName) > ($1.footprint, $0.displayName) }
@@ -164,14 +171,15 @@ enum Grouping {
     }
 
     /// 같은 실행 파일 이름끼리 묶어 footprint 상위 3줄 + "그 외 N개".
-    static func subgroups(of members: [ProcessSample]) -> [SubGroup] {
+    static func subgroups(of members: [ProcessSample], selfPid: Int32, currentUID: UInt32) -> [SubGroup] {
         let byName = Dictionary(grouping: members, by: \.name)
         let rows = byName.map { name, procs in
             SubGroup(
                 id: name, name: name, processCount: procs.count,
                 footprint: procs.reduce(0) { $0 + ($1.footprint ?? 0) },
                 cpuPercent: procs.reduce(0) { $0 + $1.cpuPercent },
-                pids: procs.map(\.pid).sorted(), isOthers: false, othersHint: nil
+                pids: procs.map(\.pid).sorted(), isOthers: false,
+                isTerminable: procs.allSatisfy { isTerminable($0, selfPid: selfPid, currentUID: currentUID) }, othersHint: nil
             )
         }
         .sorted { ($0.footprint, $1.name) > ($1.footprint, $0.name) }
@@ -184,7 +192,7 @@ enum Grouping {
             id: "others", name: "그 외 \(restCount)개", processCount: restCount,
             footprint: rest.reduce(0) { $0 + $1.footprint },
             cpuPercent: rest.reduce(0) { $0 + $1.cpuPercent },
-            pids: rest.flatMap(\.pids).sorted(), isOthers: true,
+            pids: rest.flatMap(\.pids).sorted(), isOthers: true, isTerminable: rest.allSatisfy(\.isTerminable),
             othersHint: rest.count > 1 ? "\(rest[rest.startIndex].name) 외" : rest[rest.startIndex].name
         )
         return top + [others]

@@ -106,4 +106,49 @@ struct ProcessKillerTests {
         }
         #expect(gone)
     }
+
+    @MainActor
+    @Test func alertStyleTerminateShowsConfirmForSurvivorInPresentGroup() async throws {
+        let stubborn = try spawn("/bin/sh", ["-c", "trap \"\" TERM; sleep 60"])
+        let shell = stubborn.processIdentifier
+        defer {
+            _ = try? spawn("/usr/bin/pkill", ["-KILL", "-P", "\(shell)"]).waitUntilExit()
+            kill(shell, SIGKILL)
+        }
+        try await Task.sleep(for: .milliseconds(300))
+        let targets = ProcessKiller.identities(of: [shell])
+
+        let coordinator = KillCoordinator(grace: .milliseconds(300))
+        var shownFor: String?
+        coordinator.onConfirmShown = { shownFor = $0 }
+        coordinator.groupExists = { $0 == "g" }
+        let key = KillCoordinator.groupKey("g")
+        coordinator.terminate(key: key, groupID: "g", name: "g", targets: targets)
+        try await Task.sleep(for: .milliseconds(900))
+        #expect(shownFor == "g")
+        #expect(coordinator.entries[key]?.survivors == targets)
+        // 자동 SIGKILL 은 없다
+        #expect(ProcessKiller.alive(targets) == targets)
+    }
+
+    @MainActor
+    @Test func vanishedGroupEndsWithoutConfirm() async throws {
+        let stubborn = try spawn("/bin/sh", ["-c", "trap \"\" TERM; sleep 60"])
+        let shell = stubborn.processIdentifier
+        defer {
+            _ = try? spawn("/usr/bin/pkill", ["-KILL", "-P", "\(shell)"]).waitUntilExit()
+            kill(shell, SIGKILL)
+        }
+        try await Task.sleep(for: .milliseconds(300))
+
+        let coordinator = KillCoordinator(grace: .milliseconds(300))
+        var shown = false
+        coordinator.onConfirmShown = { _ in shown = true }
+        coordinator.groupExists = { _ in false }
+        let key = KillCoordinator.groupKey("gone")
+        coordinator.terminate(key: key, groupID: "gone", name: "gone", targets: ProcessKiller.identities(of: [shell]))
+        try await Task.sleep(for: .milliseconds(900))
+        #expect(!shown)
+        #expect(coordinator.entries[key] == nil)
+    }
 }
