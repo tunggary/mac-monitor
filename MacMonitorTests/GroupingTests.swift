@@ -156,3 +156,26 @@ struct GroupingTests {
         #expect(group(samples).map(\.displayName) == ["big", "small", "nofootprint"])
     }
 }
+
+struct DisplayNameTests {
+    @Test func versionNameUsesFolderAboveVersionsContainer() {
+        let path = "/Users/me/.local/share/claude/versions/2.1.302"
+        #expect(Grouping.displayName(name: "2.1.302", path: path) == "claude")
+    }
+
+    @Test func versionNameSkipsNumericAndContainerFolders() {
+        #expect(Grouping.displayName(name: "1.0", path: "/opt/tool/releases/current/bin/1.0") == "tool")
+        #expect(Grouping.displayName(name: "3.2.1", path: "/opt/tool/3.2/3.2.1") == "tool")
+    }
+
+    @Test func normalNamesAreUntouched() {
+        #expect(Grouping.displayName(name: "node", path: "/opt/homebrew/bin/node") == "node")
+        #expect(Grouping.displayName(name: "next-server", path: nil) == "next-server")
+        #expect(Grouping.displayName(name: "python3.12", path: "/usr/bin/python3.12") == "python3.12")
+    }
+
+    @Test func versionNameWithoutUsablePathKeepsName() {
+        #expect(Grouping.displayName(name: "2.1.302", path: nil) == "2.1.302")
+        #expect(Grouping.displayName(name: "2.1.302", path: "/versions/2.1.302") == "2.1.302")
+    }
+}
