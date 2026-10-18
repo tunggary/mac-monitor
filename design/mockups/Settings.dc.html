@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>설정 창</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+:root{--ground:#0D0E12;--surface:#15171D;--surface-2:#1E2129;--surface-3:#2A2E38;--line:rgba(255,255,255,0.08);--line-strong:rgba(255,255,255,0.14);--text:#ECEEF3;--text-2:#9AA0AD;--text-3:#7D8391;--menubar:#08090C;--menubar-light:#ECEDF1;--brand:#7C85FF;--brand-2:#B9BEFF;--brand-deep:#545DE8;--green:#6FD6A8;--green-2:#B4EDD2;--green-deep:#2FA877;--yellow:#F5C96A;--yellow-2:#FBE3A8;--yellow-deep:#C08A1E;--alert:#FF7A6B;--alert-2:#FFB0A6;--alert-deep:#D2453A;--cpu:var(--brand);--mem:var(--brand);--swap:var(--brand-2);--ok:var(--green);--warn:var(--yellow);--danger:var(--alert);--accent:var(--brand)}
+a{color:var(--brand)}a:hover{color:#B9BEFF}
+.pp{width:24px;height:24px;background-image:url(/_blob/024472f08e3d6392d6a17580e9c16b4f);background-size:240px 72px;background-repeat:no-repeat;animation:pp 1s steps(10) infinite}
+.pp-green{background-position-y:0}.pp-yellow{background-position-y:-24px}.pp-coral{background-position-y:-48px}
+@keyframes pp{from{background-position-x:0}to{background-position-x:-240px}}
+.pp48{width:48px;height:48px;background-image:url(/_blob/024472f08e3d6392d6a17580e9c16b4f);background-size:480px 144px;background-repeat:no-repeat}
+</style>
+</helmet>
+<div style="width: 600px; height: 730px; box-sizing: border-box; background: var(--ground); font-family: -apple-system, 'SF Pro Text', system-ui, sans-serif; color: var(--text); font-variant-numeric: tabular-nums; padding: 24px">
+  <div style="background: var(--surface); border: 1px solid var(--line-strong); border-radius: 12px; overflow: hidden">
+    <div style="height: 40px; display: flex; align-items: center; padding: 0 14px; gap: 8px; border-bottom: 1px solid var(--line)">
+      <span aria-hidden="true" style="width: 12px; height: 12px; border-radius: 6px; background: var(--alert)"></span>
+      <span aria-hidden="true" style="width: 12px; height: 12px; border-radius: 6px; background: var(--yellow)"></span>
+      <span aria-hidden="true" style="width: 12px; height: 12px; border-radius: 6px; background: var(--green)"></span>
+      <div style="flex: 1; text-align: center; font-size: 13px; font-weight: 600; margin-right: 52px">mac-monitor 설정</div>
+    </div>
+
+    <div style="padding: 20px 24px; display: flex; flex-direction: column; gap: 22px">
+      <section style="display: flex; flex-direction: column; gap: 8px">
+        <h2 style="margin: 0; font-size: 12px; font-weight: 600; color: var(--text-2)">일반</h2>
+        <div style="background: var(--surface-2); border-radius: 10px; padding: 4px 14px">
+          <div style="display: flex; justify-content: space-between; align-items: center; height: 40px">
+            <label for="login" style="font-size: 13px">로그인 시 자동 실행</label>
+            <input id="login" type="checkbox" checked style="width: 18px; height: 18px; accent-color: #7C85FF">
+          </div>
+        </div>
+      </section>
+
+      <section style="display: flex; flex-direction: column; gap: 8px">
+        <h2 style="margin: 0; font-size: 12px; font-weight: 600; color: var(--text-2)">위험 기준</h2>
+        <div style="background: var(--surface-2); border-radius: 10px; padding: 4px 14px">
+          <sc-for list="{{rules}}" as="r" hint-placeholder-count="4">
+            <div style="display: flex; justify-content: space-between; align-items: center; min-height: 44px; border-bottom: 1px solid var(--line)">
+              <div>
+                <label for="{{r.id}}" style="font-size: 13px">{{r.label}}</label> <span style="{{r.chip}}">{{r.level}}</span>
+                <div style="font-size: 11px; color: var(--text-3)">{{r.hint}}</div>
+              </div>
+              <div style="display: flex; align-items: center; gap: 6px">
+                <input id="{{r.id}}" type="number" value="{{r.value}}" style="width: 64px; height: 26px; box-sizing: border-box; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 6px; color: var(--text); font-size: 13px; text-align: right; padding: 0 8px">
+                <span style="font-size: 12px; color: var(--text-2); width: 28px">{{r.unit}}</span>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </section>
+
+      <section style="display: flex; flex-direction: column; gap: 8px">
+        <h2 style="margin: 0; font-size: 12px; font-weight: 600; color: var(--text-2)">알림</h2>
+        <div style="background: var(--surface-2); border-radius: 10px; padding: 4px 14px">
+          <div style="display: flex; justify-content: space-between; align-items: center; height: 44px">
+            <div>
+              <label for="repeat" style="font-size: 13px">위험이 계속되면 다시 알림</label>
+              <div style="font-size: 11px; color: var(--text-3)">정상으로 돌아오면 초기화돼요</div>
+            </div>
+            <select id="repeat" style="height: 26px; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 6px; color: var(--text); font-size: 13px; padding: 0 8px">
+              <option>5분마다</option>
+              <option selected>10분마다</option>
+              <option>30분마다</option>
+              <option>다시 안 함</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <section style="display: flex; flex-direction: column; gap: 8px">
+        <h2 style="margin: 0; font-size: 12px; font-weight: 600; color: var(--text-2)">캐릭터</h2>
+        <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px">
+          <button aria-pressed="true" style="height: 72px; border-radius: 10px; border: 2px solid var(--accent); background: var(--surface-2); color: var(--text); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; font-size: 12px">
+            <div class="pp pp-green" aria-hidden="true"></div>
+            파티 앵무새
+          </button>
+          <button disabled style="height: 72px; border-radius: 10px; border: 1px dashed var(--line-strong); background: transparent; color: var(--text-3); font-size: 12px">추가 예정</button>
+          <button disabled style="height: 72px; border-radius: 10px; border: 1px dashed var(--line-strong); background: transparent; color: var(--text-3); font-size: 12px">추가 예정</button>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":600,"height":730}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const c = (v) => 'font-size:11px;font-weight:600;color:var(--' + v + ');background:color-mix(in srgb, var(--' + v + ') 16%, transparent);padding:1px 6px;border-radius:8px;margin-left:4px';
+    const rules = [
+      { id: 'swapWarn', label: '스왑 사용량', level: '주의', chip: c('warn'), hint: '앵무새가 노랑으로 바뀌어요', value: 4, unit: 'GB' },
+      { id: 'swap', label: '스왑 사용량', level: '위험', chip: c('danger'), hint: '앵무새가 코랄로 바뀌고 알림이 와요', value: 8, unit: 'GB' },
+      { id: 'free', label: '사용 가능 메모리', level: '위험', chip: c('danger'), hint: '이 값보다 적으면 위험', value: 20, unit: '%' },
+      { id: 'cpu', label: '앱 하나의 CPU', level: '주의', chip: c('warn'), hint: '코어 1개 = 100%', value: 300, unit: '%' },
+      { id: 'cpuSec', label: 'CPU 급증 지속 시간', level: '주의', chip: c('warn'), hint: '이만큼 계속되면 알림', value: 30, unit: '초' }
+    ];
+    return { rules };
+  }
+}
+</script>
+</body>
+</html>

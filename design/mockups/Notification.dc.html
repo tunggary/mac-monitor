@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>위험 알림</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+:root{--ground:#0D0E12;--surface:#15171D;--surface-2:#1E2129;--surface-3:#2A2E38;--line:rgba(255,255,255,0.08);--line-strong:rgba(255,255,255,0.14);--text:#ECEEF3;--text-2:#9AA0AD;--text-3:#7D8391;--menubar:#08090C;--menubar-light:#ECEDF1;--brand:#7C85FF;--brand-2:#B9BEFF;--brand-deep:#545DE8;--green:#6FD6A8;--green-2:#B4EDD2;--green-deep:#2FA877;--yellow:#F5C96A;--yellow-2:#FBE3A8;--yellow-deep:#C08A1E;--alert:#FF7A6B;--alert-2:#FFB0A6;--alert-deep:#D2453A;--cpu:var(--brand);--mem:var(--brand);--swap:var(--brand-2);--ok:var(--green);--warn:var(--yellow);--danger:var(--alert);--accent:var(--brand)}
+a{color:var(--brand)}a:hover{color:#B9BEFF}
+</style>
+</helmet>
+<div style="width: 440px; height: 300px; box-sizing: border-box; background: var(--ground); font-family: -apple-system, 'SF Pro Text', system-ui, sans-serif; color: var(--text); padding: 20px; display: flex; flex-direction: column; gap: 14px">
+  <div style="background: var(--surface-2); border: 1px solid var(--line-strong); border-radius: 16px; padding: 12px 14px; display: flex; gap: 12px">
+    <div aria-hidden="true" style="width: 38px; height: 38px; border-radius: 9px; background: var(--surface); display: flex; align-items: center; justify-content: center; flex: none">
+      <svg viewBox="0 0 20 20" width="20" height="20"><path d="M11 2 L4 11.5 H9.5 L8.5 18 L16 8 H10.5 Z" style="fill: var(--cpu)"></path></svg>
+    </div>
+    <div style="flex: 1; min-width: 0">
+      <div style="display: flex; justify-content: space-between; font-size: 12px; color: var(--text-3)"><span>mac-monitor</span><span>지금</span></div>
+      <div style="font-size: 13px; font-weight: 600; margin-top: 2px"><span style="font-size: 11px; font-weight: 600; color: var(--danger); background: color-mix(in srgb, var(--danger) 16%, transparent); padding: 2px 7px; border-radius: 9px; margin-right: 6px">위험</span>메모리 — 스왑 12.7 GB</div>
+      <div style="font-size: 12px; color: var(--text-2); margin-top: 3px; line-height: 1.45">Aside 20.7 GB · ego lite 3.9 GB · Claude 1.8 GB</div>
+    </div>
+  </div>
+  <div style="display: flex; gap: 8px; justify-content: flex-end">
+    <button style="height: 30px; border: none; border-radius: 8px; background: var(--surface-3); color: var(--text); font-size: 12px; font-weight: 600; padding: 0 12px">Aside 종료</button>
+    <button style="height: 30px; border: none; border-radius: 8px; background: var(--surface-3); color: var(--text); font-size: 12px; padding: 0 12px">ego lite 종료</button>
+    <button style="height: 30px; border: none; border-radius: 8px; background: var(--surface-3); color: var(--text); font-size: 12px; padding: 0 12px">팝오버 열기</button>
+  </div>
+  <div style="background: var(--surface-2); border: 1px solid var(--line-strong); border-radius: 16px; padding: 12px 14px; display: flex; gap: 12px">
+    <div aria-hidden="true" style="width: 38px; height: 38px; border-radius: 9px; background: var(--surface); display: flex; align-items: center; justify-content: center; flex: none">
+      <svg viewBox="0 0 20 20" width="20" height="20"><path d="M11 2 L4 11.5 H9.5 L8.5 18 L16 8 H10.5 Z" style="fill: var(--cpu)"></path></svg>
+    </div>
+    <div style="flex: 1; min-width: 0">
+      <div style="display: flex; justify-content: space-between; font-size: 12px; color: var(--text-3)"><span>mac-monitor</span><span>2분 전</span></div>
+      <div style="font-size: 13px; font-weight: 600; margin-top: 2px"><span style="font-size: 11px; font-weight: 600; color: var(--warn); background: color-mix(in srgb, var(--warn) 16%, transparent); padding: 2px 7px; border-radius: 9px; margin-right: 6px">주의</span>CPU 급증 — next-server 340%</div>
+      <div style="font-size: 12px; color: var(--text-2); margin-top: 3px">1pm_clinic_web-new-work-1018 · :3110 · 35초째</div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":440,"height":300}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

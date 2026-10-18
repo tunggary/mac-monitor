@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>팝오버 — 평소</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+:root{--ground:#0D0E12;--surface:#15171D;--surface-2:#1E2129;--surface-3:#2A2E38;--line:rgba(255,255,255,0.08);--line-strong:rgba(255,255,255,0.14);--text:#ECEEF3;--text-2:#9AA0AD;--text-3:#7D8391;--menubar:#08090C;--menubar-light:#ECEDF1;--brand:#7C85FF;--brand-2:#B9BEFF;--brand-deep:#545DE8;--green:#6FD6A8;--green-2:#B4EDD2;--green-deep:#2FA877;--yellow:#F5C96A;--yellow-2:#FBE3A8;--yellow-deep:#C08A1E;--alert:#FF7A6B;--alert-2:#FFB0A6;--alert-deep:#D2453A;--cpu:var(--brand);--mem:var(--brand);--swap:var(--brand-2);--ok:var(--green);--warn:var(--yellow);--danger:var(--alert);--accent:var(--brand)}
+a{color:var(--brand)}a:hover{color:#B9BEFF}
+.pp{width:24px;height:24px;background-image:url(/_blob/024472f08e3d6392d6a17580e9c16b4f);background-size:240px 72px;background-repeat:no-repeat;animation:pp 1s steps(10) infinite}
+.pp-green{background-position-y:0}.pp-yellow{background-position-y:-24px}.pp-coral{background-position-y:-48px}
+@keyframes pp{from{background-position-x:0}to{background-position-x:-240px}}
+.pp48{width:48px;height:48px;background-image:url(/_blob/024472f08e3d6392d6a17580e9c16b4f);background-size:480px 144px;background-repeat:no-repeat}
+</style>
+</helmet>
+<div style="width: 420px; height: 940px; box-sizing: border-box; background: var(--ground); font-family: -apple-system, 'SF Pro Text', system-ui, sans-serif; color: var(--text); font-variant-numeric: tabular-nums; display: flex; flex-direction: column; align-items: flex-end">
+  <div style="width: 100%; height: 28px; background: var(--menubar); display: flex; align-items: center; justify-content: flex-end; gap: 16px; padding: 0 14px; box-sizing: border-box; font-size: 13px; color: var(--text-2)">
+    <span>Wi‑Fi</span>
+    <button aria-label="mac-monitor 열기" style="width: 40px; height: 24px; border: none; border-radius: 6px; background: var(--surface-3); padding: 0; cursor: pointer; display: flex; align-items: center; justify-content: center">
+      <div class="pp pp-green" style="{{parrotStyle}}"></div>
+    </button>
+    <span>10월 18일 (토) 오후 7:40</span>
+  </div>
+
+  <div style="width: 380px; margin: 8px 12px 0 0; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 12px; box-sizing: border-box; padding: 16px; display: flex; flex-direction: column; gap: 14px">
+
+    <div style="display: flex; justify-content: space-between; align-items: center">
+      <div style="font-size: 13px; font-weight: 600; color: var(--text-2)">시스템</div>
+      <div role="group" aria-label="그래프 범위" style="display: flex; background: var(--surface-2); border-radius: 7px; padding: 2px; gap: 2px">
+        <button style="border: none; background: transparent; color: var(--text-2); font-size: 12px; padding: 4px 10px; border-radius: 5px">1분</button>
+        <button aria-pressed="true" style="border: none; background: var(--surface-3); color: var(--accent); font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 5px">10분</button>
+        <button style="border: none; background: transparent; color: var(--text-2); font-size: 12px; padding: 4px 10px; border-radius: 5px">1시간</button>
+      </div>
+    </div>
+
+    <section style="display: flex; flex-direction: column; gap: 6px">
+      <div style="display: flex; justify-content: space-between; align-items: center">
+        <div style="font-size: 20px; font-weight: 600; white-space: nowrap">CPU <span style="color: var(--cpu)">18.2%</span></div>
+        <span style="font-size: 12px; font-weight: 600; color: var(--ok); background: color-mix(in srgb, var(--ok) 16%, transparent); padding: 3px 8px; border-radius: 10px; white-space: nowrap">CPU 정상</span>
+      </div>
+      <div style="font-size: 12px; color: var(--text-2)">시스템 6.4% · 사용자 11.8% · 대기 81.8%</div>
+      <svg viewBox="0 0 348 56" width="348" height="56" preserveAspectRatio="none" role="img" aria-label="최근 10분 CPU 사용률 그래프">
+        <path d="M0,50 L8,49 L16,50 L24,48 L32,49 L40,47 L48,50 L56,49 L64,46 L72,44 L80,47 L88,49 L96,48 L104,50 L112,49 L120,45 L128,30 L136,22 L144,28 L152,40 L160,46 L168,48 L176,49 L184,47 L192,48 L200,50 L208,49 L216,47 L224,48 L232,46 L240,48 L248,49 L256,47 L264,44 L272,46 L280,48 L288,47 L296,49 L304,48 L312,46 L320,47 L328,46 L336,47 L348,46 L348,56 L0,56 Z" style="fill: var(--cpu); fill-opacity: 0.24"></path>
+        <path d="M0,50 L8,49 L16,50 L24,48 L32,49 L40,47 L48,50 L56,49 L64,46 L72,44 L80,47 L88,49 L96,48 L104,50 L112,49 L120,45 L128,30 L136,22 L144,28 L152,40 L160,46 L168,48 L176,49 L184,47 L192,48 L200,50 L208,49 L216,47 L224,48 L232,46 L240,48 L248,49 L256,47 L264,44 L272,46 L280,48 L288,47 L296,49 L304,48 L312,46 L320,47 L328,46 L336,47 L348,46" style="fill: none; stroke: var(--cpu); stroke-width: 1.5"></path>
+      </svg>
+    </section>
+
+    <div style="height: 1px; background: var(--line)"></div>
+
+    <section style="display: flex; flex-direction: column; gap: 6px">
+      <div style="display: flex; justify-content: space-between; align-items: center">
+        <div style="font-size: 20px; font-weight: 600">메모리 <span style="color: var(--mem)">63.9%</span></div>
+        <span style="font-size: 12px; font-weight: 600; color: var(--ok); background: color-mix(in srgb, var(--ok) 16%, transparent); padding: 3px 8px; border-radius: 10px">압력 정상 31%</span>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; font-size: 12px; color: var(--text-2)">
+        <div>앱 메모리<div style="font-size: 14px; color: var(--text); margin-top: 2px">7.1 GB</div></div>
+        <div>와이어드<div style="font-size: 14px; color: var(--text); margin-top: 2px">3.4 GB</div></div>
+        <div>압축됨<div style="font-size: 14px; color: var(--text); margin-top: 2px">1.9 GB</div></div>
+      </div>
+      <svg viewBox="0 0 348 48" width="348" height="48" preserveAspectRatio="none" role="img" aria-label="최근 10분 메모리 사용률 그래프">
+        <path d="M0,19 L40,18 L80,18 L120,17 L160,17 L200,16 L240,17 L280,17 L320,17 L348,17 L348,48 L0,48 Z" style="fill: var(--mem); fill-opacity: 0.24"></path>
+        <path d="M0,19 L40,18 L80,18 L120,17 L160,17 L200,16 L240,17 L280,17 L320,17 L348,17" style="fill: none; stroke: var(--mem); stroke-width: 1.5"></path>
+      </svg>
+    </section>
+
+    <section style="display: flex; flex-direction: column; gap: 6px">
+      <div style="display: flex; justify-content: space-between; align-items: baseline">
+        <div style="font-size: 14px; font-weight: 600">스왑 <span style="color: var(--swap)">1.2 GB</span></div>
+        <div style="font-size: 12px; color: var(--text-2)"><span style="color: var(--warn)">주의 4 GB</span> · <span style="color: var(--danger)">위험 8 GB</span></div>
+      </div>
+      <svg viewBox="0 0 348 40" width="348" height="40" preserveAspectRatio="none" role="img" aria-label="최근 10분 스왑 사용량 그래프, 경고 기준선 8GB">
+        <line x1="0" y1="20" x2="348" y2="20" style="stroke: var(--danger); stroke-width: 1; stroke-dasharray: 4 4; stroke-opacity: 0.7"></line>
+        <line x1="0" y1="30" x2="348" y2="30" style="stroke: var(--warn); stroke-width: 1; stroke-dasharray: 4 4; stroke-opacity: 0.7"></line>
+        <path d="M0,38 L80,38 L160,37 L240,37 L348,37 L348,40 L0,40 Z" style="fill: var(--swap); fill-opacity: 0.24"></path>
+        <path d="M0,38 L80,38 L160,37 L240,37 L348,37" style="fill: none; stroke: var(--swap); stroke-width: 1.5"></path>
+      </svg>
+    </section>
+
+    <div style="height: 1px; background: var(--line)"></div>
+
+    <section style="display: flex; flex-direction: column; gap: 4px">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px">
+        <div style="font-size: 13px; font-weight: 600; color: var(--text-2)">상위 앱</div>
+        <div role="group" aria-label="정렬 기준" style="display: flex; background: var(--surface-2); border-radius: 7px; padding: 2px; gap: 2px">
+          <button aria-pressed="true" style="border: none; background: var(--surface-3); color: var(--accent); font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 5px">메모리</button>
+          <button style="border: none; background: transparent; color: var(--text-2); font-size: 12px; padding: 3px 10px; border-radius: 5px">CPU</button>
+        </div>
+      </div>
+      <sc-for list="{{apps}}" as="app" hint-placeholder-count="5">
+        <div style="display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 8px">
+          <div aria-hidden="true" style="width: 28px; height: 28px; border-radius: 7px; background: var(--surface-3); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; color: var(--text-2); flex: none">{{app.initial}}</div>
+          <div style="flex: 1; min-width: 0">
+            <div style="font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{app.name}}</div>
+            <div style="font-size: 11px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{app.sub}}</div>
+          </div>
+          <div style="{{app.dot}}"></div>
+          <div style="font-size: 13px; flex: none">{{app.value}}</div>
+          <button aria-label="{{app.killLabel}}" style="width: 28px; height: 28px; border: none; border-radius: 7px; background: transparent; color: var(--text-3); display: flex; align-items: center; justify-content: center; flex: none; cursor: pointer">
+            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M4 4 L12 12 M12 4 L4 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg>
+          </button>
+        </div>
+      </sc-for>
+    </section>
+
+    <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 6px; border-top: 1px solid var(--line)">
+      <div style="font-size: 11px; color: var(--text-3)">측정 1초 · 앱 목록 3초</div>
+      <div style="display: flex; gap: 4px">
+        <button aria-label="설정" style="width: 28px; height: 28px; border: none; border-radius: 7px; background: transparent; color: var(--text-2); display: flex; align-items: center; justify-content: center">
+          <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="10" r="2.6"></circle><path d="M10 2.5v2.2M10 15.3v2.2M2.5 10h2.2M15.3 10h2.2M4.7 4.7l1.6 1.6M13.7 13.7l1.6 1.6M4.7 15.3l1.6-1.6M13.7 6.3l1.6-1.6" stroke-linecap="round"></path></svg>
+        </button>
+        <button style="height: 28px; border: none; border-radius: 7px; background: transparent; color: var(--text-2); font-size: 12px; padding: 0 8px">앱 종료</button>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"parrotSpeed":{"editor":"range","default":1.0,"min":0.2,"max":1.6,"step":0.05,"unit":"s"},"$preview":{"width":420,"height":940}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const dur = this.props.parrotSpeed ?? 1.0;
+    const parrotStyle = 'animation-duration:' + dur + 's';
+    const apps = [
+      { initial: 'A', name: 'Aside', sub: '프로세스 42개', value: '3.1 GB', killLabel: 'Aside 종료', multi: true, expandLabel: 'Aside 하위 프로세스 펼치기' },
+      { initial: 'S', name: 'Slack', sub: '프로세스 6개', value: '1.3 GB', killLabel: 'Slack 종료', multi: true, expandLabel: 'Slack 하위 프로세스 펼치기' },
+      { initial: 'e', name: 'ego lite', sub: '프로세스 9개', value: '1.2 GB', killLabel: 'ego lite 종료', multi: true, expandLabel: 'ego lite 하위 프로세스 펼치기' },
+      { initial: 'N', name: 'next-server', sub: '1pm_clinic_web-new-work-1018 · :3110', value: '980 MB', killLabel: 'next-server 종료', multi: false, expandLabel: '' },
+      { initial: 'c', name: 'cmux', sub: '프로세스 3개', value: '610 MB', killLabel: 'cmux 종료', multi: true, expandLabel: 'cmux 하위 프로세스 펼치기' }
+    ];
+    const L = { 'Aside': 'var(--warn)' };
+    const dotS = (c) => 'width:8px;height:8px;border-radius:4px;flex:none;background:' + c;
+    apps.forEach((a) => { a.dot = dotS(L[a.name] || 'var(--ok)'); });
+    return { parrotStyle, apps };
+  }
+}
+</script>
+</body>
+</html>

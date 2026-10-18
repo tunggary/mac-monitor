@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>색 팔레트</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+:root{--ground:#0D0E12;--surface:#15171D;--surface-2:#1E2129;--surface-3:#2A2E38;--line:rgba(255,255,255,0.08);--text:#ECEEF3;--text-2:#9AA0AD;--text-3:#7D8391;--brand:#7C85FF}
+a{color:var(--brand)}a:hover{color:#B9BEFF}
+</style>
+</helmet>
+<div style="width: 620px; height: 820px; box-sizing: border-box; background: var(--ground); font-family: -apple-system, 'SF Pro Text', system-ui, sans-serif; color: var(--text); padding: 32px; display: flex; flex-direction: column; gap: 24px">
+  <div>
+    <h1 style="margin: 0; font-size: 22px; font-weight: 700">Ink Indigo</h1>
+    <div style="font-size: 13px; color: var(--text-2); margin-top: 4px; line-height: 1.5">먹색 중립 위에 인디고가 주인공. 초록·노랑·코랄은 같은 밝기·채도로 맞춘 상태 색이에요.</div>
+  </div>
+
+  <section style="display: flex; flex-direction: column; gap: 12px">
+    <sc-for list="{{hues}}" as="h" hint-placeholder-count="4">
+      <div style="display: grid; grid-template-columns: 110px repeat(3, minmax(0, 1fr)); gap: 10px; align-items: center">
+        <div>
+          <div style="font-size: 13px; font-weight: 600">{{h.name}}</div>
+          <div style="font-size: 11px; color: var(--text-2)">{{h.role}}</div>
+        </div>
+        <sc-for list="{{h.shades}}" as="c" hint-placeholder-count="3">
+          <div style="display: flex; flex-direction: column; gap: 3px">
+            <div style="{{c.style}}"></div>
+            <div style="font-size: 10px; color: var(--text-3); font-family: ui-monospace, 'SF Mono', monospace">{{c.label}} {{c.hex}}</div>
+          </div>
+        </sc-for>
+      </div>
+    </sc-for>
+  </section>
+
+  <section style="display: flex; flex-direction: column; gap: 10px">
+    <h2 style="margin: 0; font-size: 13px; font-weight: 600; color: var(--text-2)">중립 — 먹색</h2>
+    <div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px">
+      <sc-for list="{{neutrals}}" as="n" hint-placeholder-count="7">
+        <div style="display: flex; flex-direction: column; gap: 4px">
+          <div style="{{n.style}}"></div>
+          <div style="font-size: 11px; font-weight: 600">{{n.name}}</div>
+          <div style="font-size: 10px; color: var(--text-3); font-family: ui-monospace, 'SF Mono', monospace">{{n.hex}}</div>
+        </div>
+      </sc-for>
+    </div>
+  </section>
+
+  <section style="display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--text-2); line-height: 1.55">
+    <h2 style="margin: 0 0 2px; font-size: 13px; font-weight: 600; color: var(--text-2)">사용 규칙</h2>
+    <div>· CPU·메모리·선택·토글은 인디고, 스왑은 연한 인디고.</div>
+    <div>· 상태는 신호등 순서: 정상 초록 → 주의 노랑 → 위험 코랄.</div>
+    <div>· 칩 배경은 16%, 그래프 면은 24%. 흰 글자를 올리는 면만 진한 단계.</div>
+    <div>· 앵무새는 평소 초록, 주의 노랑, 위험 코랄. 고개 까딱이는 속도는 CPU를 따라가요.</div>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":620,"height":820}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const sh = (label, hex) => ({ label, hex, style: 'height:40px;border-radius:8px;background:' + hex });
+    const hues = [
+      { name: '인디고', role: '브랜드 · CPU · 메모리', shades: [sh('연함', '#B9BEFF'), sh('기본', '#7C85FF'), sh('진함', '#545DE8')] },
+      { name: '초록', role: '정상', shades: [sh('연함', '#B4EDD2'), sh('기본', '#6FD6A8'), sh('진함', '#2FA877')] },
+      { name: '노랑', role: '주의', shades: [sh('연함', '#FBE3A8'), sh('기본', '#F5C96A'), sh('진함', '#C08A1E')] },
+      { name: '코랄', role: '위험', shades: [sh('연함', '#FFB0A6'), sh('기본', '#FF7A6B'), sh('진함', '#D2453A')] }
+    ];
+    const ns = [['ground', '#0D0E12'], ['surface', '#15171D'], ['surface-2', '#1E2129'], ['surface-3', '#2A2E38'], ['text', '#ECEEF3'], ['text-2', '#9AA0AD'], ['text-3', '#7D8391']];
+    const neutrals = ns.map(([name, hex]) => ({ name, hex, style: 'height:36px;border-radius:6px;border:1px solid rgba(255,255,255,0.1);background:' + hex }));
+    return { hues, neutrals };
+  }
+}
+</script>
+</body>
+</html>

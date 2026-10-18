@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>메뉴바 앵무새 아이콘</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+:root{--ground:#0D0E12;--surface:#15171D;--surface-2:#1E2129;--surface-3:#2A2E38;--line:rgba(255,255,255,0.08);--text:#ECEEF3;--text-2:#9AA0AD;--text-3:#7D8391;--menubar:#08090C;--menubar-light:#ECEDF1}
+a{color:#7C85FF}a:hover{color:#B9BEFF}
+.pp{width:24px;height:24px;background-image:url(/_blob/024472f08e3d6392d6a17580e9c16b4f);background-size:240px 72px;background-repeat:no-repeat;animation:pp 1s steps(10) infinite}
+.pp-green{background-position-y:0}.pp-yellow{background-position-y:-24px}.pp-coral{background-position-y:-48px}
+@keyframes pp{from{background-position-x:0}to{background-position-x:-240px}}
+.pp48{width:48px;height:48px;background-image:url(/_blob/024472f08e3d6392d6a17580e9c16b4f);background-size:480px 144px;background-repeat:no-repeat}
+</style>
+</helmet>
+<div style="width: 560px; height: 640px; box-sizing: border-box; background: var(--ground); font-family: -apple-system, 'SF Pro Text', system-ui, sans-serif; color: var(--text); padding: 28px; display: flex; flex-direction: column; gap: 22px">
+  <section style="display: flex; flex-direction: column; gap: 10px">
+    <h2 style="margin: 0; font-size: 15px; font-weight: 600">상태별 움직임</h2>
+    <div style="font-size: 12px; color: var(--text-2); line-height: 1.5">고개 까딱이는 속도는 CPU, 몸 색은 메모리 상태예요. 평소 초록, 주의 노랑, 위험 코랄.</div>
+    <sc-for list="{{states}}" as="s" hint-placeholder-count="3">
+      <div style="display: grid; grid-template-columns: 120px 120px 120px minmax(0, 1fr); gap: 12px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line)">
+        <div>
+          <div style="font-size: 13px; font-weight: 600">{{s.label}}</div>
+          <div style="font-size: 11px; color: var(--text-3)">{{s.desc}}</div>
+        </div>
+        <div style="height: 30px; background: var(--menubar); border-radius: 6px; display: flex; align-items: center; justify-content: center">
+          <div class="{{s.cls}}" style="{{s.anim}}" aria-hidden="true"></div>
+        </div>
+        <div style="height: 30px; background: var(--menubar-light); border-radius: 6px; display: flex; align-items: center; justify-content: center">
+          <div class="{{s.cls}}" style="{{s.anim}}" aria-hidden="true"></div>
+        </div>
+        <div style="font-size: 12px; color: var(--text-2)">{{s.speed}}</div>
+      </div>
+    </sc-for>
+  </section>
+
+  <section style="display: flex; flex-direction: column; gap: 10px">
+    <h2 style="margin: 0; font-size: 15px; font-weight: 600">프레임 (10장)</h2>
+    <div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px">
+      <sc-for list="{{frames}}" as="f" hint-placeholder-count="10">
+        <div style="background: var(--menubar-light); border-radius: 8px; padding: 8px 0 6px; display: flex; flex-direction: column; align-items: center; gap: 4px">
+          <div class="pp48" style="{{f.pos}}" aria-hidden="true"></div>
+          <div style="font-size: 10px; color: #5A606C">{{f.n}}</div>
+        </div>
+      </sc-for>
+    </div>
+    <div style="font-size: 12px; color: var(--text-2); line-height: 1.5">받아온 프레임의 몸통 색만 팔레트 초록·노랑·코랄로 바꿨어요. 윤곽선·부리·눈은 원본 그대로예요.</div>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":560,"height":640}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const states = [
+      { label: '평소', desc: 'CPU 12% · 메모리 정상', speed: '10장 1.2초 — 느긋하게 까딱', cls: 'pp pp-green', anim: 'animation-duration:1.2s' },
+      { label: '주의', desc: 'CPU 55% · 메모리 주의', speed: '10장 0.6초 — 신나게', cls: 'pp pp-yellow', anim: 'animation-duration:0.6s' },
+      { label: '위험', desc: 'CPU 92% · 메모리 위험', speed: '10장 0.35초 — 정신없이', cls: 'pp pp-coral', anim: 'animation-duration:0.35s' }
+    ];
+    const frames = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => ({ n: '프레임 ' + (i + 1), pos: 'background-position:' + (-48 * i) + 'px 0' }));
+    return { states, frames };
+  }
+}
+</script>
+</body>
+</html>
