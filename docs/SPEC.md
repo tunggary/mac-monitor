@@ -1,7 +1,7 @@
 # mac-monitor 구현 스펙
 
-
 > HANDOFF.md(삭제됨)의 결정사항과 2026-10-18 구현 착수 시 확정한 결정을 합친 유일한 원본. 결정이 바뀌면 이 파일을 같이 고친다.
+
 레포: /Users/m1-mac/Documents/project/mac-monitor  (git: main / develop / feature/*)
 시안 HTML: design/mockups/{Palette,Main,Danger,Notification,Icon,Settings}.dc.html — 폭·패딩·폰트·색 수치는 여기서 읽는다.
 앵무새: design/parrot-sprite.png (1280×384, 128px 프레임 10열 × 3행 초록·노랑·코랄), design/parrot-frames/{green,yellow,coral}-01..10.png
@@ -39,7 +39,7 @@
 - 메모리 위험: 스왑 > 8 GB 또는 사용 가능 메모리 < 20% → 앵무새 코랄 + 알림
 - CPU 급증(주의): 한 앱(그룹)이 CPU ≥ 300%를 30초 넘게 지속 → 알림
 - CPU 칩: 어떤 앱이든 CPU ≥ 300%(앱 CPU 주의 기준)면 "CPU 주의"(노랑), 아니면 "CPU 정상"(초록)
-- 앱 행 상태 점: 메모리 위험일 때 메모리 1위 원인 앱 = 코랄 / 메모리 주의·위험일 때 2·3위 원인 또는 CPU ≥ 300% 앱 = 노랑 / 나머지 초록
+- 앱 행 상태 점: 메모리 위험 → 1위 원인 앱 코랄, 2·3위 노랑 / 메모리 주의 → 1~3위 노랑 / CPU ≥ 300% 앱은 메모리 상태와 상관없이 노랑(코랄이 우선) / 나머지 초록
   ("원인" = 메모리 footprint 큰 순)
 
 ## 메뉴바 아이콘 — 파티 앵무새
@@ -53,7 +53,8 @@
 배경 surface, 테두리 line-strong 1px, radius 12, padding 16, 섹션 gap 14. 폰트 시스템(SF Pro), 숫자 tabular-nums(.monospacedDigit()).
 1. (메모리 위험일 때만) 상단 배너: danger 16% 배경, radius 10, padding 10×12, 경고 삼각형 18px.
    제목 13 semibold "메모리 위험 — 스왑 12.7 GB", 본문 12 text-2 "경고 기준 8 GB를 4분째 넘고 있어요. 가장 큰 원인은 Aside(20.7 GB)예요."
-   (사용 가능 메모리 때문에 위험이면 제목 "메모리 위험 — 사용 가능 18%" 식으로 원인 지표를 쓴다)
+   사용 가능 메모리가 원인이면: 제목 "메모리 위험 — 사용 가능 18%" / 본문 "경고 기준 20%보다 4분째 적어요. 가장 큰 원인은 Aside(20.7 GB)예요." 둘 다 해당하면 스왑 문구 우선.
+   "N분째"는 앱이 위험을 처음 감지한 시각부터(최소 1분 표기).
 2. "시스템"(13 semibold text-2) + 범위 토글 1분 / 10분(기본) / 1시간 (세그먼트: surface-2 배경 radius 7 padding 2 gap 2, 버튼 12px padding 4×10 radius 5, 선택 = surface-3 배경 + accent 글자 semibold)
 3. CPU: "CPU 18.2%" 20 semibold(수치는 cpu 색) + 오른쪽 상태 칩 / 아랫줄 12 text-2 "시스템 6.4% · 사용자 11.8% · 대기 81.8%" / 영역 그래프 높이 56
 4. (구분선 1px line) 메모리: "메모리 63.9%" 20 semibold + 칩 "압력 정상 31%" / 3열(앱 메모리·와이어드·압축됨, 라벨 12 text-2, 값 14 text) / 그래프 높이 48
@@ -69,7 +70,8 @@
 
 ## 앱 묶기 규칙
 - GUI 앱은 .app 번들 단위로 합산 (Aside Helper ×96 → Aside). responsible pid → NSRunningApplication / 실행 경로에서 가장 바깥 .app 번들.
-- 터미널에서 띄운 CLI 프로세스(node, next-server, vite, python…)는 터미널 앱에 묶지 않는다. 키 = 명령 이름 + cwd 폴더. 같은 폴더의 같은 명령은 합쳐 "N개". 부가정보 = cwd 폴더명 · :리슨포트.
+- 터미널에서 띄운 CLI 프로세스(node, next-server, vite, python…)는 터미널 앱에 묶지 않는다. 키 = 명령 이름 + cwd 폴더. 같은 폴더의 같은 명령은 한 줄로 합친다. 부가정보 = cwd 폴더명 · :리슨포트(여러 개면 첫 번째), 합친 프로세스가 2개 이상이면 뒤에 " · N개".
+- 프로세스 이름이 버전 문자열(예 "2.1.302", Claude Code CLI)이면 실행 경로에서 versions 같은 컨테이너 폴더를 건너뛴 상위 폴더명으로 보정("claude").
 - 셸(zsh/bash/fish/sh, login)은 터미널 앱에 합산.
 - "터미널에서 띄운" 판정: responsible 앱이 터미널 계열(Terminal, iTerm2, cmux, Ghostty, WezTerm, Warp, Alacritty, kitty 등)이고, 그 터미널 앱 번들 바깥의 실행 파일인 경우.
 
@@ -79,6 +81,7 @@
   "Aside를 강제종료할까요?"(12 semibold) / "일반 종료에 응답하지 않아요. 저장 안 된 작업은 사라져요."(11 text-2) / 버튼 취소(surface-3) · 강제종료(alert-deep 배경 흰 글자 semibold), 높이 26.
   강제종료 = SIGKILL.
 - 종료 동작은 종료(SIGTERM)와 강제종료(SIGKILL) 두 가지뿐. 일시정지(SIGSTOP)는 넣지 않기로 확정.
+- 다른 계정 소유 프로세스(WindowServer, kernel_task 등)는 root 없이 메모리·CPU를 읽을 수 없어 상위 앱 목록에 나오지 않는다(확정). 전체 메모리·스왑·CPU 수치는 시스템 전체 값이라 영향 없음.
 - 내 계정(uid == getuid()) 프로세스만. 시스템 프로세스(다른 uid, kernel_task, WindowServer 등)와 이 앱 자신은 × 숨김. root 권한 상승 없음. 자동 kill 없음.
 
 ## 알림 — UNUserNotificationCenter + 카테고리 액션
@@ -97,6 +100,9 @@
 - 알림: "위험이 계속되면 다시 알림" (힌트 "정상으로 돌아오면 초기화돼요") — 5분마다 / 10분마다(기본) / 30분마다 / 다시 안 함
 - 캐릭터: 3칸 그리드, 파티 앵무새(선택됨, accent 2px 테두리, 움직이는 미리보기) + "추가 예정" 점선 칸 2개(disabled)
 - 설정은 UserDefaults.
+
+## 단위
+- 용량은 1024 기준(GiB) 값에 "GB" 라벨 (활성 상태 보기·sysctl 과 같은 기준). 스왑 기준 비교도 같은 기준.
 
 ## 색 팔레트 — Ink Indigo (Theme.swift 한 곳에 토큰, 화면은 의미 토큰만 참조)
 | 토큰 | 연함 | 기본 | 진함 |

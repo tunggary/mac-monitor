@@ -68,6 +68,23 @@ enum Grouping {
         shellNames.contains(name.hasPrefix("-") ? String(name.dropFirst()) : name)
     }
 
+    /// 경로를 거슬러 올라갈 때 건너뛰는 컨테이너 폴더 이름
+    static let containerFolderNames: Set<String> = ["versions", "version", "releases", "current", "latest", "bin"]
+
+    /// pbi_name 이 버전 문자열(숫자와 점만, 예 "2.1.302")이면 실행 경로에서 의미 있는 이름을 찾는다.
+    /// 예: ~/.local/share/claude/versions/2.1.302 → "claude". 못 찾으면 원래 이름.
+    static func displayName(name: String, path: String?) -> String {
+        guard !name.isEmpty, name.allSatisfy({ $0.isNumber || $0 == "." }), let path else { return name }
+        let folders = path.split(separator: "/", omittingEmptySubsequences: true).dropLast()
+        for folder in folders.reversed() {
+            let text = String(folder)
+            if containerFolderNames.contains(text.lowercased()) { continue }
+            if text.allSatisfy({ $0.isNumber || $0 == "." }) { continue }
+            return text
+        }
+        return name
+    }
+
     static func cwdFolder(_ cwd: String?) -> String? {
         guard let cwd, cwd != "/" else { return nil }
         let last = (cwd as NSString).lastPathComponent

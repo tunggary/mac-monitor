@@ -113,6 +113,7 @@ final class ProcessSampler {
                 staticCache[key] = info
             }
             if name.isEmpty, let path = info.path { name = (path as NSString).lastPathComponent }
+            name = Grouping.displayName(name: name, path: info.path)
 
             var footprint: UInt64?
             var cpuPercent = 0.0

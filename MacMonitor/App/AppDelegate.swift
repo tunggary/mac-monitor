@@ -2,16 +2,11 @@ import AppKit
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    private var statusItem: NSStatusItem?
+    private let model = AppModel()
+    private var statusController: StatusItemController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        item.button?.title = "mm"
-
-        let menu = NSMenu()
-        menu.addItem(NSMenuItem(title: "종료", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
-        item.menu = menu
-
-        statusItem = item
+        statusController = StatusItemController(model: model, character: PartyParrot())
+        model.start()
     }
 }
