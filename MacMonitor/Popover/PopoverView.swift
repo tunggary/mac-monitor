@@ -3,6 +3,8 @@ import SwiftUI
 /// 아이콘 클릭 시 뜨는 팝오버 내용. 폭 380, 다크 고정.
 struct PopoverView: View {
     let model: AppModel
+    let openSettings: () -> Void
+    @State private var height: CGFloat = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -16,13 +18,32 @@ struct PopoverView: View {
             SwapSection(model: model)
             SectionDivider()
             TopAppsSection(model: model)
-            FooterBar()
+            FooterBar(openSettings: openSettings)
         }
         .padding(16)
         .frame(width: 380)
         .background(Theme.surface.color)
         .monospacedDigit()
         .preferredColorScheme(.dark)
+        .coordinateSpace(name: PopoverSpace.name)
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height = $0 }
+        .environment(\.popoverHeight, height)
+    }
+}
+
+/// 펼친 행이 팝오버 밖으로 잘리지 않게 위치를 잡기 위한 좌표 공간·높이
+enum PopoverSpace {
+    static let name = "popover"
+}
+
+private struct PopoverHeightKey: EnvironmentKey {
+    static let defaultValue: CGFloat = 0
+}
+
+extension EnvironmentValues {
+    var popoverHeight: CGFloat {
+        get { self[PopoverHeightKey.self] }
+        set { self[PopoverHeightKey.self] = newValue }
     }
 }
 
@@ -30,27 +51,15 @@ private struct DangerBanner: View {
     let model: AppModel
 
     private var title: String {
-        guard let latest = model.latest else { return "메모리 위험" }
-        switch model.dangerCause {
-        case .availableMemory: return "메모리 위험 — 사용 가능 \(Format.wholePercent(latest.availablePercent))"
-        default: return "메모리 위험 — 스왑 \(Format.gb(latest.swapUsedBytes))"
-        }
+        guard let latest = model.latest, let cause = model.dangerCause else { return "메모리 위험" }
+        return "메모리 위험 — " + Judgement.causeTitle(cause: cause, swapBytes: latest.swapUsedBytes, availablePercent: latest.availablePercent)
     }
 
     private var message: String {
+        guard let cause = model.dangerCause else { return "" }
         let minutes = model.dangerSince.map { Judgement.dangerMinutes(since: $0, now: Date()) } ?? 1
-        let settings = model.settings
-        var text: String
-        switch model.dangerCause {
-        case .availableMemory:
-            text = "사용 가능 메모리가 기준 \(Format.wholePercent(settings.availableDangerPercent)) 아래로 \(minutes)분째 내려가 있어요."
-        default:
-            text = "경고 기준 \(Format.thresholdGB(settings.swapDangerGB))를 \(minutes)분째 넘고 있어요."
-        }
-        if let top = model.topMemoryGroup {
-            text += " 가장 큰 원인은 \(top.displayName)(\(Format.memory(top.footprint)))예요."
-        }
-        return text
+        let top = model.topMemoryGroup.map { (name: $0.displayName, footprint: $0.footprint) }
+        return Judgement.bannerBody(cause: cause, settings: model.settings, minutes: minutes, top: top)
     }
 
     var body: some View {
@@ -236,13 +245,16 @@ private struct TopAppsSection: View {
             }
             .padding(.bottom, 4)
             ForEach(model.topApps) { group in
-                AppRowView(group: group, dot: dots[group.id] ?? .ok, sort: model.sort)
+                AppRowView(model: model, group: group, dot: dots[group.id] ?? .ok)
+                    .zIndex(model.expandedID == group.id ? 1 : 0)
             }
         }
     }
 }
 
 private struct FooterBar: View {
+    let openSettings: () -> Void
+
     var body: some View {
         HStack {
             Text("측정 1초 · 앱 목록 3초")
@@ -250,7 +262,7 @@ private struct FooterBar: View {
                 .foregroundStyle(Theme.text3.color)
             Spacer()
             Button {
-                // 다음 단계: 설정 창
+                openSettings()
             } label: {
                 Image(systemName: "gearshape")
                     .font(.system(size: 14))

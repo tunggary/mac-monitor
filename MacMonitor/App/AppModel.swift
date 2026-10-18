@@ -25,7 +25,18 @@ final class AppModel {
     private(set) var tick = 0
     var range: TimeRange = .tenMinutes
     var sort: AppSort = .memory
-    var settings = Settings.load()
+    /// 값이 바뀌면 UserDefaults 에 저장하고 판정에 바로 반영한다.
+    var settings = Settings.load() {
+        didSet {
+            guard settings != oldValue else { return }
+            settings.save()
+            if let latest { updateMemoryLevel(snapshot: latest) }
+            onUpdate?()
+        }
+    }
+    /// 펼친 행의 그룹 id (한 번에 하나)
+    var expandedID: String?
+    let kill = KillCoordinator()
 
     @ObservationIgnored private var cpuBuffer = RingBuffer<Double>()
     @ObservationIgnored private var memoryBuffer = RingBuffer<Double>()
@@ -35,6 +46,9 @@ final class AppModel {
     @ObservationIgnored private var tasks: [Task<Void, Never>] = []
     /// 메뉴바 쪽이 상태 변화를 받는 훅 (뷰가 아니라 관찰 불필요)
     @ObservationIgnored var onUpdate: (() -> Void)?
+    /// 보낼 알림이 생겼을 때
+    @ObservationIgnored var onAlert: ((AlertMessage) -> Void)?
+    @ObservationIgnored private var alertEngine = AlertEngine()
 
     var dangerCause: DangerCause? {
         guard let latest else { return nil }
@@ -73,6 +87,7 @@ final class AppModel {
 
     func start() {
         guard tasks.isEmpty else { return }
+        kill.onConfirmShown = { [weak self] groupID in self?.expandedID = groupID }
         tasks.append(Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(1), tolerance: .milliseconds(200))
@@ -95,20 +110,39 @@ final class AppModel {
         memoryBuffer.append(snapshot.memoryPercent)
         swapBuffer.append(Double(snapshot.swapUsedBytes))
 
-        let level = Judgement.memoryLevel(swapBytes: snapshot.swapUsedBytes, availablePercent: snapshot.availablePercent, settings: settings)
-        if level == .danger {
-            dangerSince = dangerSince ?? snapshot.date
-        } else {
-            dangerSince = nil
-        }
-        memoryLevel = level
+        updateMemoryLevel(snapshot: snapshot)
         latest = snapshot
         tick &+= 1
+        evaluateMemoryAlert(snapshot: snapshot)
         onUpdate?()
+    }
+
+    private func updateMemoryLevel(snapshot: SystemSnapshot) {
+        let level = Judgement.memoryLevel(swapBytes: snapshot.swapUsedBytes, availablePercent: snapshot.availablePercent, settings: settings)
+        dangerSince = level == .danger ? (dangerSince ?? snapshot.date) : nil
+        memoryLevel = level
+    }
+
+    private func evaluateMemoryAlert(snapshot: SystemSnapshot) {
+        // 원인 앱 목록이 아직 없으면(시작 직후) 다음 틱으로 미룬다
+        if memoryLevel == .danger, groups.isEmpty { return }
+        guard alertEngine.memory(level: memoryLevel, now: snapshot.date, settings: settings),
+              let cause = dangerCause else { return }
+        onAlert?(AlertMessages.memory(
+            cause: cause, swapBytes: snapshot.swapUsedBytes, availablePercent: snapshot.availablePercent, groups: groups
+        ))
     }
 
     private func apply(groups: [AppGroup]) {
         self.groups = groups
+        let ids = Set(groups.map(\.id))
+        if let expandedID, !ids.contains(expandedID) { self.expandedID = nil }
+        kill.prune(existingGroupIDs: ids)
+        for spike in alertEngine.cpu(groups: groups.map { ($0.id, $0.cpuPercent) }, now: Date(), settings: settings) {
+            if let group = groups.first(where: { $0.id == spike.groupID }) {
+                onAlert?(AlertMessages.cpu(group: group, seconds: spike.seconds))
+            }
+        }
         tick &+= 1
         onUpdate?()
     }
