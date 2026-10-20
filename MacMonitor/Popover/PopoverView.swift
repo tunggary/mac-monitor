@@ -4,7 +4,6 @@ import SwiftUI
 struct PopoverView: View {
     let model: AppModel
     let openSettings: () -> Void
-    @State private var height: CGFloat = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -25,25 +24,6 @@ struct PopoverView: View {
         .background(Theme.surface.color)
         .monospacedDigit()
         .preferredColorScheme(.dark)
-        .coordinateSpace(name: PopoverSpace.name)
-        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height = $0 }
-        .environment(\.popoverHeight, height)
-    }
-}
-
-/// 펼친 행이 팝오버 밖으로 잘리지 않게 위치를 잡기 위한 좌표 공간·높이
-enum PopoverSpace {
-    static let name = "popover"
-}
-
-private struct PopoverHeightKey: EnvironmentKey {
-    static let defaultValue: CGFloat = 0
-}
-
-extension EnvironmentValues {
-    var popoverHeight: CGFloat {
-        get { self[PopoverHeightKey.self] }
-        set { self[PopoverHeightKey.self] = newValue }
     }
 }
 
@@ -228,6 +208,9 @@ private struct SwapSection: View {
 
 private struct TopAppsSection: View {
     @Bindable var model: AppModel
+    /// 접힌 행의 실제 높이(첫 측정 전 기본값). 목록 높이 = 접힌 행 5개.
+    @State private var rowHeight: CGFloat = 46
+    @State private var scroll = ScrollMetrics()
 
     var body: some View {
         let _ = model.tick
@@ -244,10 +227,63 @@ private struct TopAppsSection: View {
                 )
             }
             .padding(.bottom, 4)
-            ForEach(model.topApps) { group in
-                AppRowView(model: model, group: group, dot: dots[group.id] ?? .ok)
-                    .zIndex(model.expandedID == group.id ? 1 : 0)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: Self.rowSpacing) {
+                        ForEach(model.topApps) { group in
+                            AppRowView(model: model, group: group, dot: dots[group.id] ?? .ok)
+                                .id(group.id)
+                                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
+                                    if model.expandedID != group.id { rowHeight = height }
+                                }
+                        }
+                    }
+                }
+                .frame(height: rowHeight * 5 + Self.rowSpacing * 4)
+                // 시스템 스크롤 막대는 폭을 차지해 행이 왼쪽으로 밀리므로 숨기고, 얇은 막대를 위에 겹쳐 그린다.
+                .scrollIndicators(.never)
+                .onScrollGeometryChange(for: ScrollMetrics.self) { geometry in
+                    ScrollMetrics(
+                        content: geometry.contentSize.height,
+                        container: geometry.containerSize.height,
+                        offset: geometry.contentOffset.y
+                    )
+                } action: { _, metrics in scroll = metrics }
+                .overlay(alignment: .topTrailing) { ThinScrollIndicator(metrics: scroll) }
+                .onChange(of: model.expandedID) { _, id in
+                    guard let id else { return }
+                    // 펼친 내용이 레이아웃된 뒤, 보이도록 필요한 만큼만 스크롤
+                    DispatchQueue.main.async { withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(id) } }
+                }
             }
+        }
+    }
+
+    private static let rowSpacing: CGFloat = 4
+}
+
+private struct ScrollMetrics: Equatable {
+    var content: CGFloat = 0
+    var container: CGFloat = 0
+    var offset: CGFloat = 0
+}
+
+/// 목록 위에 겹쳐 그리는 3pt 스크롤 막대. 스크롤할 내용이 있을 때만 보인다.
+private struct ThinScrollIndicator: View {
+    let metrics: ScrollMetrics
+    private static let width: CGFloat = 3
+    private static let minThumb: CGFloat = 20
+
+    var body: some View {
+        let scrollable = metrics.content - metrics.container
+        if scrollable > 1, metrics.container > 0 {
+            let thumb = max(Self.minThumb, metrics.container * metrics.container / metrics.content)
+            let progress = min(1, max(0, metrics.offset / scrollable))
+            Capsule()
+                .fill(Theme.text3.opacity(0.6).color)
+                .frame(width: Self.width, height: thumb)
+                .offset(x: -1, y: (metrics.container - thumb) * progress)
+                .allowsHitTesting(false)
         }
     }
 }
