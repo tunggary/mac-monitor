@@ -117,3 +117,9 @@
 의미: cpu = brand · mem = brand · swap = brand-연함 · ok = green · warn = yellow · danger = alert · accent(선택·토글·포커스) = brand · 강제종료 버튼 면 = alert-진함(흰 글자)
 규칙: 상태 칩 배경 16%(칩 padding 3×8 radius 10, 12 semibold), 그래프 면 24%. 평소 화면엔 인디고·먹색·초록만, 노랑·코랄은 주의·위험에만(예외: 스왑 기준 점선).
 다크 고정(팝오버·설정 창은 .preferredColorScheme(.dark) / NSAppearance darkAqua).
+
+## 버전 관리 (../git-graph-panel 과 같은 방식)
+- Semantic Versioning `MAJOR.MINOR.PATCH`. 버전 값은 Xcode `MARKETING_VERSION`(앱 타깃 Debug/Release 와 테스트 타깃 모두 같은 값)이다.
+- 릴리스: develop 에서 `release/x.y.z` 분기 → `build: 버전을 x.y.z로 올린다` 커밋(MARKETING_VERSION 변경, CURRENT_PROJECT_VERSION +1) → main 에 `--no-ff` 머지("Merge branch 'release/x.y.z' into main") → main 머지 커밋에 annotated 태그 `vx.y.z`(메시지 `vx.y.z`) → develop 에도 머지.
+- 올릴 자리: 직전 태그 이후 커밋에 `feat` 가 있으면 MINOR, `fix`·`style`·`refactor` 등만 있으면 PATCH. 0.x 동안 MAJOR 는 올리지 않는다.
+- 첫 릴리스 v0.1.0 (2026-10-20): 프로젝트 기본값이 이미 0.1.0 이라 버전 올림 커밋 없이 태그만 붙였다.
