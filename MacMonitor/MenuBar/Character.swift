@@ -28,8 +28,8 @@ final class PartyParrot: Character {
     nonisolated static let frameCount = 10
     /// 10장 / 1.2초 ... 10장 / 0.35초
     nonisolated static let speedRange = (Double(frameCount) / 1.2)...(Double(frameCount) / 0.35)
-    /// 메뉴바에 그리는 크기(pt). 메뉴바 높이(22pt)에 꽉 차게.
-    static let drawSize: CGFloat = 22
+    /// 메뉴바에 그리는 크기(pt). 메뉴바 높이(22pt)보다 살짝 작게.
+    static let drawSize: CGFloat = 18
 
     let name = "파티 앵무새"
     let framesPerSecondRange = PartyParrot.speedRange
