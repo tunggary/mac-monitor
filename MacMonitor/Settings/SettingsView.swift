@@ -326,11 +326,10 @@ private struct CharacterSection: View {
     }
 }
 
-/// 설정 창 안의 움직이는 앵무새 미리보기 (24×24, 초록, 10프레임 / 1초)
+/// 설정 창 안의 움직이는 앵무새 미리보기 (24×24, 메뉴바와 같은 흰 테두리, 10프레임 / 1초)
 private struct ParrotPreview: View {
-    private static let frames: [NSImage] = (1...PartyParrot.frameCount).compactMap { index in
-        Bundle.main.url(forResource: String(format: "green-%02d", index), withExtension: "png")
-            .flatMap { NSImage(contentsOf: $0) }
+    private static let frames: [NSImage] = PartyParrot.outlineSources().map {
+        NSImage(cgImage: $0, size: NSSize(width: $0.width, height: $0.height))
     }
 
     var body: some View {
