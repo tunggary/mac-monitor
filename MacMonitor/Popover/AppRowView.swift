@@ -1,38 +1,23 @@
 import SwiftUI
 
-/// 상위 앱 한 행. 클릭하면 펼친다(한 번에 하나).
-/// 펼친 영역은 행 위에 겹쳐 그려서(overlay) 팝오버 높이와 다른 행 위치가 변하지 않는다.
+/// 상위 앱 한 행. 클릭하면 그 자리에서 펼친다(한 번에 하나).
+/// 목록은 고정 높이 스크롤 영역 안에 있어서, 펼쳐도 팝오버 높이와 하단 바는 변하지 않는다.
 struct AppRowView: View {
     let model: AppModel
     let group: AppGroup
     let dot: RowDot
-    @Environment(\.popoverHeight) private var popoverHeight
-    @State private var rowMinY: CGFloat = 0
-    @State private var panelHeight: CGFloat = 0
-
-    /// 펼친 영역이 팝오버 아래로 넘치면 넘친 만큼만 위로 올린다 (다른 행은 그대로).
-    private static let bottomMargin: CGFloat = 8
 
     private var expanded: Bool { model.expandedID == group.id }
     private var groupKey: String { KillCoordinator.groupKey(group.id) }
 
-    private var panelOffset: CGFloat {
-        guard popoverHeight > 0, panelHeight > 0 else { return 0 }
-        let overflow = rowMinY + panelHeight - (popoverHeight - Self.bottomMargin)
-        guard overflow > 0 else { return 0 }
-        return -min(overflow, max(0, rowMinY - Self.bottomMargin))
-    }
-
     private func toggle() { model.expandedID = expanded ? nil : group.id }
 
     var body: some View {
-        RowHeader(group: group, dot: dot, sort: model.sort, expanded: false, onToggle: toggle, onKill: killGroup)
-            .opacity(expanded ? 0 : 1)
-            .accessibilityHidden(expanded)
-            .onGeometryChange(for: CGFloat.self) { $0.frame(in: .named(PopoverSpace.name)).minY } action: { rowMinY = $0 }
-            .overlay(alignment: .topLeading) {
-                if expanded { panel.offset(y: panelOffset) }
-            }
+        if expanded {
+            panel
+        } else {
+            RowHeader(group: group, dot: dot, sort: model.sort, expanded: false, onToggle: toggle, onKill: killGroup)
+        }
     }
 
     private var panel: some View {
@@ -50,8 +35,6 @@ struct AppRowView: View {
         }
         .padding(.bottom, 8)
         .background(Theme.surface2.color, in: RoundedRectangle(cornerRadius: 10))
-        .fixedSize(horizontal: false, vertical: true)
-        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { panelHeight = $0 }
     }
 
     @ViewBuilder
