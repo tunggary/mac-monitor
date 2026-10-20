@@ -13,7 +13,8 @@ private final class FrameView: NSView {
         super.init(frame: frame)
         wantsLayer = true
         translatesAutoresizingMaskIntoConstraints = false
-        layer?.contentsGravity = .center
+        // 아래쪽에 붙이고, 하단 여백은 버튼 제약(bottomPadding)으로 준다.
+        layer?.contentsGravity = .bottom
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
@@ -53,6 +54,8 @@ private final class FrameView: NSView {
 /// 메뉴바 앵무새 + 클릭 시 팝오버 토글.
 @MainActor
 final class StatusItemController: NSObject, NSPopoverDelegate {
+    /// 앵무새 하단 여백(pt)
+    private static let bottomPadding: CGFloat = 3
     private static let log = Logger(subsystem: "com.mac-monitor", category: "animation")
     private let model: AppModel
     private let openSettings: () -> Void
@@ -68,7 +71,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         self.model = model
         self.openSettings = openSettings
         self.character = character
-        statusItem = NSStatusBar.system.statusItem(withLength: 34)
+        statusItem = NSStatusBar.system.statusItem(withLength: 32)
         super.init()
 
         popover.behavior = .transient
@@ -81,7 +84,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
                 frameView.leadingAnchor.constraint(equalTo: button.leadingAnchor),
                 frameView.trailingAnchor.constraint(equalTo: button.trailingAnchor),
                 frameView.topAnchor.constraint(equalTo: button.topAnchor),
-                frameView.bottomAnchor.constraint(equalTo: button.bottomAnchor),
+                frameView.bottomAnchor.constraint(equalTo: button.bottomAnchor, constant: -Self.bottomPadding),
             ])
             button.target = self
             button.action = #selector(togglePopover)
