@@ -28,8 +28,8 @@ final class PartyParrot: Character {
     nonisolated static let frameCount = 10
     /// 10장 / 1.2초 ... 10장 / 0.35초
     nonisolated static let speedRange = (Double(frameCount) / 1.2)...(Double(frameCount) / 0.35)
-    /// 메뉴바에 그리는 크기(pt). 시안은 24×24 버튼 안.
-    static let drawSize: CGFloat = 18
+    /// 메뉴바에 그리는 크기(pt). 메뉴바 높이(22pt)에 꽉 차게.
+    static let drawSize: CGFloat = 22
 
     let name = "파티 앵무새"
     let framesPerSecondRange = PartyParrot.speedRange
@@ -37,34 +37,63 @@ final class PartyParrot: Character {
 
     init(bundle: Bundle = .main) {
         let names: [(MemoryLevel, String)] = [(.normal, "green"), (.caution, "yellow"), (.danger, "coral")]
-        var cache: [MemoryLevel: [NSImage]] = [:]
+        var sources: [MemoryLevel: [CGImage]] = [:]
         for (level, color) in names {
-            cache[level] = (1...Self.frameCount).compactMap { index in
+            sources[level] = (1...Self.frameCount).compactMap { index in
                 let file = String(format: "%@-%02d", color, index)
                 guard let url = bundle.url(forResource: file, withExtension: "png"),
-                      let source = NSImage(contentsOf: url) else { return nil }
-                return Self.resized(source, points: Self.drawSize)
+                      let image = NSImage(contentsOf: url) else { return nil }
+                return image.cgImage(forProposedRect: nil, context: nil, hints: nil)
             }
         }
-        self.cache = cache
+        // 원본 위쪽이 투명 여백이라, 전 프레임의 그림 영역 합집합으로 잘라 메뉴바 높이에 맞춘다.
+        // 프레임마다 따로 자르면 고개 까딱임이 흔들리므로 공통 영역 하나를 쓴다.
+        let all = sources.values.flatMap { $0 }
+        let crop = all.reduce(CGRect.null) { $0.union(Self.opaqueBounds($1)) }
+        self.cache = sources.mapValues { $0.compactMap { Self.render($0, crop: crop, height: Self.drawSize) } }
     }
 
     func frames(for level: MemoryLevel) -> [NSImage] { cache[level] ?? [] }
 
-    /// 레티나(@2x) 비트맵으로 미리 그려 둔다. 템플릿 아님(색이 핵심).
-    private static func resized(_ source: NSImage, points: CGFloat) -> NSImage {
-        let pixels = Int(points * 2)
-        let rep = NSBitmapImageRep(
-            bitmapDataPlanes: nil, pixelsWide: pixels, pixelsHigh: pixels, bitsPerSample: 8,
+    /// 알파가 있는 픽셀의 경계(왼쪽 위 원점, CGImage.cropping 좌표계).
+    private static func opaqueBounds(_ image: CGImage) -> CGRect {
+        let width = image.width, height = image.height
+        var pixels = [UInt8](repeating: 0, count: width * height)
+        let drawn = pixels.withUnsafeMutableBytes { buffer -> Bool in
+            guard let context = CGContext(
+                data: buffer.baseAddress, width: width, height: height, bitsPerComponent: 8,
+                bytesPerRow: width, space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.alphaOnly.rawValue
+            ) else { return false }
+            context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+            return true
+        }
+        guard drawn else { return CGRect(x: 0, y: 0, width: width, height: height) }
+        var minX = width, minY = height, maxX = -1, maxY = -1
+        for y in 0..<height {
+            for x in 0..<width where pixels[y * width + x] > 12 {
+                minX = min(minX, x); maxX = max(maxX, x); minY = min(minY, y); maxY = max(maxY, y)
+            }
+        }
+        guard maxX >= minX else { return .null }
+        // 비트맵 메모리의 첫 행이 이미지 위쪽이다.
+        return CGRect(x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1)
+    }
+
+    /// 잘라낸 영역을 높이 기준으로 레티나(@2x) 비트맵에 그려 둔다. 템플릿 아님(색이 핵심).
+    private static func render(_ source: CGImage, crop: CGRect, height points: CGFloat) -> NSImage? {
+        guard let cropped = source.cropping(to: crop) else { return nil }
+        let size = NSSize(width: (points * crop.width / crop.height).rounded(), height: points)
+        guard let rep = NSBitmapImageRep(
+            bitmapDataPlanes: nil, pixelsWide: Int(size.width * 2), pixelsHigh: Int(size.height * 2), bitsPerSample: 8,
             samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
-            bytesPerRow: 0, bitsPerPixel: 0)!
-        rep.size = NSSize(width: points, height: points)
+            bytesPerRow: 0, bitsPerPixel: 0) else { return nil }
+        rep.size = size
         NSGraphicsContext.saveGraphicsState()
         NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
         NSGraphicsContext.current?.imageInterpolation = .high
-        source.draw(in: NSRect(x: 0, y: 0, width: points, height: points), from: .zero, operation: .copy, fraction: 1)
+        NSGraphicsContext.current?.cgContext.draw(cropped, in: CGRect(origin: .zero, size: size))
         NSGraphicsContext.restoreGraphicsState()
-        let image = NSImage(size: rep.size)
+        let image = NSImage(size: size)
         image.addRepresentation(rep)
         image.isTemplate = false
         return image

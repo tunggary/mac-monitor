@@ -68,7 +68,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         self.model = model
         self.openSettings = openSettings
         self.character = character
-        statusItem = NSStatusBar.system.statusItem(withLength: 30)
+        statusItem = NSStatusBar.system.statusItem(withLength: 34)
         super.init()
 
         popover.behavior = .transient
