@@ -117,19 +117,8 @@ private struct RowHeader: View {
     private var killButton: some View {
         if !group.isTerminable {
             Color.clear.frame(width: 28, height: 28)
-        } else if expanded {
-            Button(action: onKill) {
-                Text("종료")
-                    .font(.system(size: 12))
-                    .foregroundStyle(Theme.text.color)
-                    .padding(.horizontal, 10)
-                    .frame(height: 28)
-                    .background(Theme.surface3.color, in: RoundedRectangle(cornerRadius: 7))
-                    .contentShape(RoundedRectangle(cornerRadius: 7))
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("\(group.displayName) 종료")
         } else {
+            // 펼쳐도 같은 × (앱 전체 종료)
             Button(action: onKill) {
                 Image(systemName: "xmark")
                     .font(.system(size: 11, weight: .semibold))
