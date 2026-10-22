@@ -1,28 +1,29 @@
 import SwiftUI
 
-/// 아이콘 클릭 시 뜨는 팝오버 내용. 폭 380, 다크 고정.
+/// 아이콘 클릭 시 뜨는 팝오버 내용. 폭 380, 다크 고정. 배경은 루트에 건 Liquid Glass (투명 NSPanel 위).
 struct PopoverView: View {
     let model: AppModel
     let openSettings: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            if model.memoryLevel == .danger {
-                DangerBanner(model: model)
+        // 제어 센터처럼: 바깥 판도, 모듈 하나하나도 맑은 유리 조각.
+        GlassEffectContainer(spacing: 10) {
+            VStack(alignment: .leading, spacing: 10) {
+                if model.memoryLevel == .danger {
+                    DangerBanner(model: model)
+                }
+                SystemHeader(model: model)
+                CPUSection(model: model)
+                MemorySection(model: model)
+                SwapSection(model: model)
+                TopAppsSection(model: model)
+                FooterBar(openSettings: openSettings)
             }
-            SystemHeader(model: model)
-            CPUSection(model: model)
-            SectionDivider()
-            MemorySection(model: model)
-            SwapSection(model: model)
-            SectionDivider()
-            TopAppsSection(model: model)
-            FooterBar(openSettings: openSettings)
         }
-        .padding(16)
+        .padding(12)
         .frame(width: 380)
-        .background(Theme.surface.color)
         .monospacedDigit()
+        .glassEffect(Theme.popoverGlass, in: .rect(cornerRadius: Theme.popoverRadius, style: .continuous))
         .preferredColorScheme(.dark)
     }
 }
@@ -48,18 +49,18 @@ private struct DangerBanner: View {
             VStack(alignment: .leading, spacing: 0) {
                 Text(title)
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Theme.text.color)
+                    .foregroundStyle(.white)
                 Text(message)
                     .font(.system(size: 12))
-                    .foregroundStyle(Theme.text2.color)
+                    .foregroundStyle(.white.opacity(0.9))
                     .fixedSize(horizontal: false, vertical: true)
             }
             .lineSpacing(2)
             Spacer(minLength: 0)
         }
-        .padding(.vertical, 10)
-        .padding(.horizontal, 12)
-        .background(Theme.danger.opacity(Theme.chipBackgroundOpacity).color, in: RoundedRectangle(cornerRadius: 10))
+        .padding(.vertical, 12)
+        .padding(.horizontal, 14)
+        .background(Theme.bannerFill, in: RoundedRectangle(cornerRadius: Theme.moduleRadius, style: .continuous))
         .accessibilityElement(children: .combine)
     }
 }
@@ -71,13 +72,14 @@ private struct SystemHeader: View {
         HStack {
             Text("시스템")
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(Theme.text2.color)
+                .foregroundStyle(.secondary)
             Spacer()
             SegmentedToggle(
                 options: [(TimeRange.oneMinute, "1분"), (.tenMinutes, "10분"), (.oneHour, "1시간")],
                 selection: $model.range
             )
         }
+        .padding(.horizontal, 6)
     }
 }
 
@@ -91,72 +93,103 @@ private extension TimeRange {
     }
 }
 
+/// 큰 숫자 + 작은 % (CPU·메모리 모듈 2행)
+private struct BigPercent: View {
+    let value: Double
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 2) {
+            Text(String(format: "%.1f", value))
+                .font(.system(size: 30, weight: .semibold))
+                .foregroundStyle(.primary)
+            Text("%")
+                .font(.system(size: 18))
+                .foregroundStyle(.secondary)
+        }
+        .lineLimit(1)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Format.percent(value))
+    }
+}
+
 private struct CPUSection: View {
     let model: AppModel
 
     var body: some View {
         let _ = model.tick
         let snapshot = model.latest
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 0) {
             HStack {
-                Text("CPU \(Text(Format.percent(snapshot?.cpuBusy ?? 0)).foregroundStyle(Theme.cpu.color))")
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(Theme.text.color)
-                    .lineLimit(1)
+                Text("CPU")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.secondary)
                 Spacer()
                 if model.isCPUCaution {
-                    Chip(text: "CPU 주의", color: Theme.warn)
+                    StatusLabel(text: "주의", color: Theme.warn)
                 } else {
-                    Chip(text: "CPU 정상", color: Theme.ok)
+                    StatusLabel(text: "정상", color: Theme.ok, tinted: false)
                 }
             }
+            BigPercent(value: snapshot?.cpuBusy ?? 0)
             Text("시스템 \(Format.percent(snapshot?.cpuSystem ?? 0)) · 사용자 \(Format.percent(snapshot?.cpuUser ?? 0)) · 대기 \(Format.percent(snapshot?.cpuIdle ?? 0))")
                 .font(.system(size: 12))
-                .foregroundStyle(Theme.text2.color)
+                .foregroundStyle(.secondary)
             MetricChart(
-                points: model.chartPoints(.cpu), color: Theme.cpu, yDomain: 0...100,
-                rangeSamples: model.range.sampleCount, height: 56,
+                points: model.chartPoints(.cpu), tint: model.isCPUCaution ? Theme.warn : nil, yDomain: 0...100,
+                rangeSamples: model.range.sampleCount, height: 52,
                 label: "최근 \(model.range.label) CPU 사용률 그래프"
             )
+            .padding(.top, 8)
         }
+        .glassModule(EdgeInsets(top: 14, leading: 14, bottom: 12, trailing: 14))
     }
 }
 
 private struct MemorySection: View {
     let model: AppModel
 
-    private var chip: (text: String, color: ThemeColor) {
+    private var status: (text: String, color: Color, tinted: Bool) {
         let pressure = Format.wholePercent(model.latest?.pressurePercent ?? 0)
         switch model.memoryLevel {
-        case .normal: return ("압력 정상 \(pressure)", Theme.ok)
-        case .caution: return ("압력 주의 \(pressure)", Theme.warn)
-        case .danger: return ("압력 위험 \(pressure)", Theme.danger)
+        case .normal: return ("압력 정상 \(pressure)", Theme.ok, false)
+        case .caution: return ("압력 주의 \(pressure)", Theme.warn, true)
+        case .danger: return ("압력 위험 \(pressure)", Theme.danger, true)
+        }
+    }
+
+    private var graphTint: Color? {
+        switch model.memoryLevel {
+        case .normal: nil
+        case .caution: Theme.warn
+        case .danger: Theme.danger
         }
     }
 
     var body: some View {
         let _ = model.tick
         let snapshot = model.latest
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 0) {
             HStack {
-                Text("메모리 \(Text(Format.percent(snapshot?.memoryPercent ?? 0)).foregroundStyle(Theme.mem.color))")
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(Theme.text.color)
-                    .lineLimit(1)
+                Text("메모리")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.secondary)
                 Spacer()
-                Chip(text: chip.text, color: chip.color)
+                StatusLabel(text: status.text, color: status.color, tinted: status.tinted)
             }
+            BigPercent(value: snapshot?.memoryPercent ?? 0)
             HStack(alignment: .top, spacing: 8) {
                 MemoryFigure(label: "앱 메모리", value: Format.gb(snapshot?.appMemoryBytes ?? 0))
                 MemoryFigure(label: "와이어드", value: Format.gb(snapshot?.wiredBytes ?? 0))
                 MemoryFigure(label: "압축됨", value: Format.gb(snapshot?.compressedBytes ?? 0))
             }
             MetricChart(
-                points: model.chartPoints(.memory), color: Theme.mem, yDomain: 0...100,
-                rangeSamples: model.range.sampleCount, height: 48,
+                points: model.chartPoints(.memory), tint: graphTint, yDomain: 0...100,
+                rangeSamples: model.range.sampleCount, height: 44,
                 label: "최근 \(model.range.label) 메모리 사용률 그래프"
             )
+            .padding(.top, 8)
         }
+        .glassModule(EdgeInsets(top: 14, leading: 14, bottom: 12, trailing: 14))
     }
 }
 
@@ -166,8 +199,8 @@ private struct MemoryFigure: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(label).font(.system(size: 12)).foregroundStyle(Theme.text2.color)
-            Text(value).font(.system(size: 14)).foregroundStyle(Theme.text.color)
+            Text(label).font(.system(size: 11)).foregroundStyle(.secondary)
+            Text(value).font(.system(size: 14, weight: .medium)).foregroundStyle(.primary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -181,21 +214,26 @@ private struct SwapSection: View {
         let settings = model.settings
         let swapBytes = model.latest?.swapUsedBytes ?? 0
         let overDanger = Double(swapBytes) > settings.swapDangerBytes
+        let overCaution = Double(swapBytes) > settings.swapCautionBytes
+        let tint: Color? = overDanger ? Theme.danger : (overCaution ? Theme.warn : nil)
         let points = model.chartPoints(.swapGB)
         let yMax = Judgement.swapYMaxGB(dangerGB: settings.swapDangerGB, observedMaxGB: points.map(\.y).max() ?? 0)
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline) {
-                Text("스왑 \(Text(Format.gb(swapBytes)).foregroundStyle(Theme.swap.color))")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Theme.text.color)
+                Text("스왑")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                Text(Format.gb(swapBytes))
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(.primary)
                 Spacer()
-                Text("\(Text("주의 \(Format.thresholdGB(settings.swapCautionGB))").foregroundStyle(Theme.warn.color)) · \(Text(overDanger ? "위험 \(Format.thresholdGB(settings.swapDangerGB)) 초과" : "위험 \(Format.thresholdGB(settings.swapDangerGB))").foregroundStyle(Theme.danger.color).fontWeight(overDanger ? .semibold : .regular))")
-                .font(.system(size: 12))
-                .foregroundStyle(Theme.text2.color)
+                Text("주의 \(Format.thresholdGB(settings.swapCautionGB)) · \(Text(overDanger ? "위험 \(Format.thresholdGB(settings.swapDangerGB)) 초과" : "위험 \(Format.thresholdGB(settings.swapDangerGB))").foregroundStyle(overDanger ? AnyShapeStyle(Theme.danger) : AnyShapeStyle(.secondary)).fontWeight(overDanger ? .semibold : .regular))")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
             }
             MetricChart(
-                points: points, color: Theme.swap, yDomain: 0...yMax,
-                rangeSamples: model.range.sampleCount, height: 40,
+                points: points, tint: tint, yDomain: 0...yMax,
+                rangeSamples: model.range.sampleCount, height: 30,
                 rules: [
                     .init(value: settings.swapDangerGB, color: Theme.danger),
                     .init(value: settings.swapCautionGB, color: Theme.warn),
@@ -203,6 +241,7 @@ private struct SwapSection: View {
                 label: "최근 \(model.range.label) 스왑 사용량 그래프"
             )
         }
+        .glassModule(EdgeInsets(top: 12, leading: 14, bottom: 12, trailing: 14))
     }
 }
 
@@ -219,13 +258,14 @@ private struct TopAppsSection: View {
             HStack {
                 Text("상위 앱")
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Theme.text2.color)
+                    .foregroundStyle(.secondary)
                 Spacer()
                 SegmentedToggle(
                     options: [(AppSort.memory, "메모리"), (.cpu, "CPU")],
                     selection: $model.sort, verticalPadding: 3
                 )
             }
+            .padding(.horizontal, 6)
             .padding(.bottom, 4)
             ScrollViewReader { proxy in
                 ScrollView {
@@ -257,6 +297,7 @@ private struct TopAppsSection: View {
                 }
             }
         }
+        .glassModule(EdgeInsets(top: 12, leading: 8, bottom: 8, trailing: 8))
     }
 
     private static let rowSpacing: CGFloat = 4
@@ -280,7 +321,7 @@ private struct ThinScrollIndicator: View {
             let thumb = max(Self.minThumb, metrics.container * metrics.container / metrics.content)
             let progress = min(1, max(0, metrics.offset / scrollable))
             Capsule()
-                .fill(Theme.text3.opacity(0.6).color)
+                .fill(Theme.scrollIndicator)
                 .frame(width: Self.width, height: thumb)
                 .offset(x: -1, y: (metrics.container - thumb) * progress)
                 .allowsHitTesting(false)
@@ -295,32 +336,31 @@ private struct FooterBar: View {
         HStack {
             Text("측정 1초 · 앱 목록 3초")
                 .font(.system(size: 11))
-                .foregroundStyle(Theme.text3.color)
+                .foregroundStyle(.secondary)
             Spacer()
             Button {
                 openSettings()
             } label: {
                 Image(systemName: "gearshape")
                     .font(.system(size: 14))
-                    .foregroundStyle(Theme.text2.color)
-                    .frame(width: 28, height: 28)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 30, height: 30)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.glass)
+            .buttonBorderShape(.circle)
             .accessibilityLabel("설정")
             Button {
                 NSApplication.shared.terminate(nil)
             } label: {
                 Text("앱 종료")
                     .font(.system(size: 12))
-                    .foregroundStyle(Theme.text2.color)
-                    .padding(.horizontal, 8)
-                    .frame(height: 28)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 6)
+                    .frame(height: 30)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.glass)
+            .buttonBorderShape(.capsule)
         }
-        .padding(.top, 6)
-        .overlay(alignment: .top) {
-            Rectangle().fill(Theme.line.color).frame(height: 1)
-        }
+        .padding(.horizontal, 6)
     }
 }
