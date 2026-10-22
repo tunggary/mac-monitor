@@ -5,6 +5,8 @@ import SwiftUI
 struct SettingsView: View {
     @Bindable var model: AppModel
 
+    private static let titlebarHeight: CGFloat = 28
+
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
             GeneralSection()
@@ -13,9 +15,13 @@ struct SettingsView: View {
             CharacterSection()
         }
         .padding(.horizontal, 24)
-        .padding(.vertical, 20)
+        .padding(.bottom, 20)
+        // fullSizeContentView 라 내용이 타이틀바 밑으로 들어간다. 타이틀바(28) 만큼 위 여백을 직접 둔다.
+        .padding(.top, 20 + Self.titlebarHeight)
         .frame(width: 552)
-        .background(Theme.surface.color)
+        // 유리는 타이틀바·하단 안전 영역까지 창 전체를 덮는다.
+        .background { Color.clear.glassEffect(.regular, in: .rect(cornerRadius: 0)).padding(.bottom, -60).ignoresSafeArea() }
+        .ignoresSafeArea()
         .monospacedDigit()
         .preferredColorScheme(.dark)
     }
@@ -29,19 +35,20 @@ private struct SettingsSection<Content: View>: View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(Theme.text2.color)
+                .foregroundStyle(.secondary)
+                .padding(.leading, 6)
             content
         }
     }
 }
 
 private extension View {
-    /// 섹션 카드: surface-2, radius 10, padding 4×14
+    /// 섹션 카드: 팝오버 모듈과 같은 맑은 유리, radius 18, 가로 padding 16
     func settingsCard() -> some View {
-        padding(.horizontal, 14)
+        padding(.horizontal, 16)
             .padding(.vertical, 4)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Theme.surface2.color, in: RoundedRectangle(cornerRadius: 10))
+            .glassEffect(Theme.moduleGlass, in: .rect(cornerRadius: Theme.moduleRadius, style: .continuous))
     }
 }
 
@@ -57,18 +64,17 @@ private struct GeneralSection: View {
                 HStack {
                     Text("로그인 시 자동 실행")
                         .font(.system(size: 13))
-                        .foregroundStyle(Theme.text.color)
+                        .foregroundStyle(.primary)
                     Spacer()
                     Toggle("로그인 시 자동 실행", isOn: binding)
                         .labelsHidden()
-                        .toggleStyle(.checkbox)
-                        .tint(Theme.accent.color)
+                        .toggleStyle(.switch)
                 }
                 .frame(height: 40)
                 if let message {
                     Text(message)
                         .font(.system(size: 11))
-                        .foregroundStyle(Theme.danger.color)
+                        .foregroundStyle(Theme.danger)
                         .padding(.bottom, 8)
                 }
             }
@@ -76,7 +82,7 @@ private struct GeneralSection: View {
         }
     }
 
-    /// 토글하면 register/unregister 하고, 실패하면 체크박스를 되돌리고 에러 한 줄을 보인다.
+    /// 토글하면 register/unregister 하고, 실패하면 스위치를 되돌리고 에러 한 줄을 보인다.
     private var binding: Binding<Bool> {
         Binding(
             get: { isOn },
@@ -128,7 +134,7 @@ private struct ThresholdSection: View {
 private struct ThresholdRow: View {
     let label: String
     let level: String
-    let color: ThemeColor
+    let color: Color
     let hint: String
     @Binding var value: Double
     let unit: String
@@ -147,17 +153,13 @@ private struct ThresholdRow: View {
                 HStack(spacing: 4) {
                     Text(label)
                         .font(.system(size: 13))
-                        .foregroundStyle(Theme.text.color)
-                    Text(level)
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(color.color)
-                        .padding(.vertical, 1)
-                        .padding(.horizontal, 6)
-                        .background(color.opacity(Theme.chipBackgroundOpacity).color, in: RoundedRectangle(cornerRadius: 8))
+                        .foregroundStyle(.primary)
+                    StatusLabel(text: level, color: color, tinted: false)
+                        .padding(.leading, 2)
                 }
                 Text(hint)
                     .font(.system(size: 11))
-                    .foregroundStyle(Theme.text3.color)
+                    .foregroundStyle(.secondary)
             }
             Spacer()
             HStack(spacing: 6) {
@@ -165,16 +167,16 @@ private struct ThresholdRow: View {
                     .textFieldStyle(.plain)
                     .focused($focused)
                     .font(.system(size: 13))
-                    .foregroundStyle(Theme.text.color)
+                    .foregroundStyle(.primary)
                     .multilineTextAlignment(.trailing)
-                    .padding(.horizontal, 8)
-                    .frame(width: 64, height: 26)
-                    .background(Theme.surface.color, in: RoundedRectangle(cornerRadius: 6))
-                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(focused ? Theme.accent.color : Theme.lineStrong.color, lineWidth: 1))
+                    .padding(.horizontal, 10)
+                    .frame(width: 64, height: 28)
+                    .background(Theme.insetFill, in: Capsule())
+                    .overlay(Capsule().strokeBorder(focused ? Theme.accent : Theme.inputBorder, lineWidth: 1))
                     .accessibilityLabel("\(label) \(level) 기준")
                 Text(unit)
                     .font(.system(size: 12))
-                    .foregroundStyle(Theme.text2.color)
+                    .foregroundStyle(.secondary)
                     .frame(width: 28, alignment: .leading)
             }
         }
@@ -184,12 +186,12 @@ private struct ThresholdRow: View {
             if let errorMessage {
                 Text(errorMessage)
                     .font(.system(size: 11))
-                    .foregroundStyle(Theme.danger.color)
+                    .foregroundStyle(Theme.danger)
                     .padding(.bottom, 6)
             }
         }
         .overlay(alignment: .bottom) {
-            if !isLast { Rectangle().fill(Theme.line.color).frame(height: 1) }
+            if !isLast { Rectangle().fill(Theme.divider).frame(height: 1) }
         }
         .onAppear { text = Format.number(value) }
         .onChange(of: text) { _, newText in
@@ -272,10 +274,10 @@ private struct NotificationSection: View {
                 VStack(alignment: .leading, spacing: 0) {
                     Text("위험이 계속되면 다시 알림")
                         .font(.system(size: 13))
-                        .foregroundStyle(Theme.text.color)
+                        .foregroundStyle(.primary)
                     Text("정상으로 돌아오면 초기화돼요")
                         .font(.system(size: 11))
-                        .foregroundStyle(Theme.text3.color)
+                        .foregroundStyle(.secondary)
                 }
                 Spacer()
                 Picker("위험이 계속되면 다시 알림", selection: $model.settings.repeatIntervalMinutes) {
@@ -299,23 +301,24 @@ private struct CharacterSection: View {
                     ParrotPreview()
                     Text("파티 앵무새")
                         .font(.system(size: 12))
-                        .foregroundStyle(Theme.text.color)
+                        .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity)
-                .frame(height: 72)
-                .background(Theme.surface2.color, in: RoundedRectangle(cornerRadius: 10))
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.accent.color, lineWidth: 2))
+                .frame(height: 84)
+                .background(Theme.expandedRowFill, in: RoundedRectangle(cornerRadius: Theme.moduleRadius, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: Theme.moduleRadius, style: .continuous).strokeBorder(Theme.accent, lineWidth: 2))
                 .accessibilityElement(children: .combine)
                 .accessibilityAddTraits(.isSelected)
                 ForEach(0..<2, id: \.self) { _ in
                     Text("추가 예정")
                         .font(.system(size: 12))
-                        .foregroundStyle(Theme.text3.color)
+                        .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity)
-                        .frame(height: 72)
+                        .frame(height: 84)
+                        .background(Theme.placeholderFill, in: RoundedRectangle(cornerRadius: Theme.moduleRadius, style: .continuous))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 10)
-                                .strokeBorder(Theme.lineStrong.color, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+                            RoundedRectangle(cornerRadius: Theme.moduleRadius, style: .continuous)
+                                .strokeBorder(Theme.placeholderBorder, style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
                         )
                         .accessibilityElement(children: .combine)
                         .accessibilityAddTraits(.isStaticText)

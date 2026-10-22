@@ -17,9 +17,12 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
             controller.sizingOptions = [.preferredContentSize]
             let window = NSWindow(contentViewController: controller)
             window.title = "mac-monitor 설정"
-            window.styleMask = [.titled, .closable]
+            window.styleMask = [.titled, .closable, .fullSizeContentView]
+            window.titlebarAppearsTransparent = true
             window.appearance = NSAppearance(named: .darkAqua)
-            window.backgroundColor = Theme.surface.nsColor
+            // 뒤의 유리(glassEffect)가 비치도록 창 자체 배경은 비운다.
+            window.isOpaque = false
+            window.backgroundColor = .clear
             window.isReleasedWhenClosed = false
             window.delegate = self
             window.center()

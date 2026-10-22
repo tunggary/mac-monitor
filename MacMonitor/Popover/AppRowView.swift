@@ -34,7 +34,7 @@ struct AppRowView: View {
             confirmBox(key: groupKey)
         }
         .padding(.bottom, 8)
-        .background(Theme.surface2.color, in: RoundedRectangle(cornerRadius: 10))
+        .background(Theme.expandedRowFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     @ViewBuilder
@@ -62,9 +62,12 @@ private struct RowHeader: View {
     let onToggle: () -> Void
     let onKill: () -> Void
 
-    private var dotColor: ThemeColor {
+    @State private var hovering = false
+
+    /// 정상 행은 점을 그리지 않는다 (자리는 유지해 값 정렬이 흔들리지 않게).
+    private var dotColor: Color {
         switch dot {
-        case .ok: Theme.ok
+        case .ok: .clear
         case .warn: Theme.warn
         case .danger: Theme.danger
         }
@@ -85,26 +88,28 @@ private struct RowHeader: View {
             AppIcon(group: group)
             VStack(alignment: .leading, spacing: 0) {
                 Text(group.displayName)
-                    .font(.system(size: 13, weight: dot == .danger ? .semibold : .regular))
-                    .foregroundStyle(Theme.text.color)
+                    .font(.system(size: 13, weight: dot == .danger ? .semibold : .medium))
+                    .foregroundStyle(.primary)
                     .lineLimit(1)
                     .truncationMode(.tail)
                 Text(detail)
                     .font(.system(size: 11))
-                    .foregroundStyle(Theme.text3.color)
+                    .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            Circle().fill(dotColor.color).frame(width: 8, height: 8)
+            Circle().fill(dotColor).frame(width: 7, height: 7)
             Text(value)
-                .font(.system(size: 13, weight: dot == .danger ? .semibold : .regular))
-                .foregroundStyle(dot == .danger ? Theme.danger.color : Theme.text.color)
+                .font(.system(size: 13, weight: dot == .danger ? .semibold : .medium))
+                .foregroundStyle(.primary)
                 .fixedSize()
             killButton
         }
-        .padding(8)
+        .padding(EdgeInsets(top: 7, leading: 8, bottom: 7, trailing: 6))
+        .background(hovering && !expanded ? Theme.hoverFill : .clear, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .contentShape(Rectangle())
+        .onHover { hovering = $0 }
         .onTapGesture(perform: onToggle)
         .accessibilityElement(children: .contain)
         .accessibilityAddTraits(.isButton)
@@ -119,20 +124,34 @@ private struct RowHeader: View {
             Color.clear.frame(width: 28, height: 28)
         } else {
             // 펼쳐도 같은 × (앱 전체 종료)
-            Button(action: onKill) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(Theme.text3.color)
-                    .frame(width: 28, height: 28)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("\(group.displayName) 종료")
+            KillXButton(size: 28, iconSize: 11, action: onKill)
+                .accessibilityLabel("\(group.displayName) 종료")
         }
     }
 }
 
-/// 펼친 영역의 하위 묶음 줄. 이름 시작 위치(왼쪽 46px)에 맞춘다.
+/// 원형 × 버튼. hover 시 white 14% 원 + primary.
+private struct KillXButton: View {
+    let size: CGFloat
+    let iconSize: CGFloat
+    let action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "xmark")
+                .font(.system(size: iconSize, weight: .semibold))
+                .foregroundStyle(hovering ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+                .frame(width: size, height: size)
+                .background(hovering ? Theme.iconHoverFill : .clear, in: Circle())
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+    }
+}
+
+/// 펼친 영역의 하위 묶음 줄. 이름 시작 위치(왼쪽 48)에 맞춘다.
 private struct SubRowView: View {
     let sort: AppSort
     let sub: SubGroup
@@ -151,35 +170,28 @@ private struct SubRowView: View {
             VStack(alignment: .leading, spacing: 0) {
                 Text(sub.name)
                     .font(.system(size: 12))
-                    .foregroundStyle(Theme.text.color)
+                    .foregroundStyle(.primary)
                     .lineLimit(1)
                     .truncationMode(.tail)
                 Text(RowText.detail(sub: sub))
                     .font(.system(size: 11))
-                    .foregroundStyle(Theme.text3.color)
+                    .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             Text(value)
                 .font(.system(size: 12))
-                .foregroundStyle(Theme.text2.color)
+                .foregroundStyle(.secondary)
                 .fixedSize()
             if canKill {
-                Button(action: onKill) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 9.5, weight: .semibold))
-                        .foregroundStyle(Theme.text3.color)
-                        .frame(width: 26, height: 26)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
+                KillXButton(size: 26, iconSize: 9.5, action: onKill)
                 .accessibilityLabel("\(sub.name) 종료")
             } else {
                 Color.clear.frame(width: 26, height: 26)
             }
         }
-        .padding(EdgeInsets(top: 6, leading: 46, bottom: 6, trailing: 8))
+        .padding(EdgeInsets(top: 6, leading: 48, bottom: 6, trailing: 8))
     }
 }
 
@@ -193,10 +205,10 @@ private struct ForceKillBox: View {
         VStack(alignment: .leading, spacing: 0) {
             Text("\(name)\(Korean.objectParticle(for: name)) 강제종료할까요?")
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(Theme.text.color)
+                .foregroundStyle(.primary)
             Text("일반 종료에 응답하지 않아요. 저장 안 된 작업은 사라져요.")
                 .font(.system(size: 11))
-                .foregroundStyle(Theme.text2.color)
+                .foregroundStyle(.secondary)
                 .lineSpacing(2)
                 .padding(.top, 2)
             HStack(spacing: 6) {
@@ -204,31 +216,27 @@ private struct ForceKillBox: View {
                 Button(action: onCancel) {
                     Text("취소")
                         .font(.system(size: 12))
-                        .foregroundStyle(Theme.text.color)
-                        .padding(.horizontal, 10)
-                        .frame(height: 26)
-                        .background(Theme.surface3.color, in: RoundedRectangle(cornerRadius: 6))
-                        .contentShape(RoundedRectangle(cornerRadius: 6))
+                        .padding(.horizontal, 6)
+                        .frame(height: 28)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.glass)
+                .buttonBorderShape(.capsule)
                 Button(action: onForce) {
                     Text("강제종료")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Theme.forceKillText.color)
-                        .padding(.horizontal, 10)
-                        .frame(height: 26)
-                        .background(Theme.forceKillFill.color, in: RoundedRectangle(cornerRadius: 6))
-                        .contentShape(RoundedRectangle(cornerRadius: 6))
+                        .padding(.horizontal, 6)
+                        .frame(height: 28)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.glassProminent)
+                .buttonBorderShape(.capsule)
+                .tint(.red)
             }
             .padding(.top, 8)
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.surface.color, in: RoundedRectangle(cornerRadius: 8))
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Theme.danger.opacity(0.5).color, lineWidth: 1))
-        .padding(EdgeInsets(top: 8, leading: 46, bottom: 0, trailing: 8))
+        .background(Theme.insetFill, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .padding(EdgeInsets(top: 8, leading: 48, bottom: 0, trailing: 8))
         .accessibilityElement(children: .contain)
     }
 }
@@ -244,15 +252,15 @@ private struct AppIcon: View {
                     .interpolation(.high)
             } else {
                 ZStack {
-                    Theme.surface3.color
+                    Theme.iconPlaceholderFill
                     Text(String(group.displayName.prefix(1)))
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Theme.text2.color)
+                        .foregroundStyle(.secondary)
                 }
             }
         }
-        .frame(width: 28, height: 28)
-        .clipShape(RoundedRectangle(cornerRadius: 7))
+        .frame(width: 30, height: 30)
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         .accessibilityHidden(true)
     }
 }

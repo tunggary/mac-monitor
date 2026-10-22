@@ -51,9 +51,24 @@ private final class FrameView: NSView {
     }
 }
 
-/// 메뉴바 앵무새 + 클릭 시 팝오버 토글.
+/// 키 입력은 안 받지만 스크롤·hover 이벤트를 위해 key 가 될 수 있는 테두리 없는 패널.
+private final class PopoverPanel: NSPanel {
+    var onCancel: (() -> Void)?
+    override var canBecomeKey: Bool { true }
+    override func cancelOperation(_ sender: Any?) { onCancel?() }
+}
+
+/// preferredContentSize 가 바뀔 때 알려 주는 호스팅 컨트롤러.
+private final class SizeReportingHostingController<Content: View>: NSHostingController<Content> {
+    var onSizeChange: ((NSSize) -> Void)?
+    override var preferredContentSize: NSSize {
+        didSet { if preferredContentSize != oldValue { onSizeChange?(preferredContentSize) } }
+    }
+}
+
+/// 메뉴바 앵무새 + 클릭 시 유리 패널 토글.
 @MainActor
-final class StatusItemController: NSObject, NSPopoverDelegate {
+final class StatusItemController: NSObject {
     /// 앵무새 하단 여백(pt)
     private static let bottomPadding: CGFloat = 3
     private static let log = Logger(subsystem: "com.mac-monitor", category: "animation")
@@ -61,7 +76,10 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
     private let openSettings: () -> Void
     private let character: any Character
     private let statusItem: NSStatusItem
-    private let popover = NSPopover()
+    private var panel: PopoverPanel?
+    private var hosting: SizeReportingHostingController<PopoverView>?
+    private var monitors: [Any] = []
+    private var resignObserver: NSObjectProtocol?
     private var shownLevel: MemoryLevel = .normal
     private let frameView = FrameView(frame: .zero)
     /// 상태별 CGImage 캐시 (NSImage → CGImage 변환은 시작 후 한 번만)
@@ -73,10 +91,6 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         self.character = character
         statusItem = NSStatusBar.system.statusItem(withLength: 32)
         super.init()
-
-        popover.behavior = .transient
-        popover.appearance = NSAppearance(named: .darkAqua)
-        popover.delegate = self
 
         if let button = statusItem.button {
             button.addSubview(frameView)
@@ -139,11 +153,14 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         statusItem.button?.setAccessibilityLabel(label)
     }
 
-    // MARK: 팝오버 — 열 때만 뷰를 만들고, 닫으면 버려서 SwiftUI 갱신이 돌지 않게 한다.
+    // MARK: 패널 — 열 때만 뷰를 만들고, 닫으면 버려서 SwiftUI 갱신이 돌지 않게 한다.
+
+    private static let panelGap: CGFloat = 6
+    private static let screenMargin: CGFloat = 8
 
     @objc private func togglePopover() {
-        if popover.isShown {
-            popover.performClose(nil)
+        if panel != nil {
+            closePopover()
         } else {
             showPopover()
         }
@@ -151,18 +168,90 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
 
     /// 알림 클릭 등 밖에서도 팝오버를 열 수 있게 한다.
     func showPopover() {
-        guard !popover.isShown, let button = statusItem.button else { return }
-        let controller = NSHostingController(rootView: PopoverView(model: model, openSettings: { [weak self] in
-            self?.popover.performClose(nil)
+        guard panel == nil, let button = statusItem.button, button.window != nil else { return }
+        let controller = SizeReportingHostingController(rootView: PopoverView(model: model, openSettings: { [weak self] in
+            self?.closePopover()
             self?.openSettings()
         }))
         controller.sizingOptions = [.preferredContentSize]
-        popover.contentViewController = controller
-        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-        popover.contentViewController?.view.window?.makeKey()
+        controller.view.layoutSubtreeIfNeeded()
+        controller.onSizeChange = { [weak self] size in self?.resizePanel(to: size, animate: true) }
+
+        let panel = PopoverPanel(
+            contentRect: NSRect(origin: .zero, size: controller.view.fittingSize),
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        // 창 그림자는 사각 윤곽으로 그려져 둥근 유리 모서리 밖에 검은 모서리가 비친다. 그림자는 유리 자체에 맡긴다.
+        panel.hasShadow = false
+        panel.level = .popUpMenu
+        panel.collectionBehavior = [.canJoinAllSpaces, .transient, .ignoresCycle]
+        panel.isReleasedWhenClosed = false
+        panel.appearance = NSAppearance(named: .darkAqua)
+        panel.onCancel = { [weak self] in self?.closePopover() }
+        panel.contentView = controller.view
+
+        self.panel = panel
+        hosting = controller
+        resizePanel(to: controller.view.fittingSize, animate: false)
+        button.highlight(true)
+        panel.makeKeyAndOrderFront(nil)
+        installDismissMonitors()
     }
 
-    func popoverDidClose(_ notification: Notification) {
-        popover.contentViewController = nil
+    /// 상태 아이템 아래 중앙, 화면 밖이면 안으로. 높이가 바뀌어도 위쪽을 고정한다.
+    private func resizePanel(to size: NSSize, animate: Bool) {
+        guard let panel, let button = statusItem.button, let buttonWindow = button.window,
+              size.width > 0, size.height > 0 else { return }
+        let buttonFrame = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
+        let visible = (buttonWindow.screen ?? NSScreen.main)?.visibleFrame ?? .zero
+        let top = buttonFrame.minY - Self.panelGap
+        var x = buttonFrame.midX - size.width / 2
+        x = min(x, visible.maxX - Self.screenMargin - size.width)
+        x = max(x, visible.minX + Self.screenMargin)
+        panel.setFrame(NSRect(x: x, y: top - size.height, width: size.width, height: size.height), display: true, animate: animate && panel.isVisible)
+    }
+
+    private func statusButtonFrame() -> NSRect {
+        guard let button = statusItem.button, let window = button.window else { return .zero }
+        return window.convertToScreen(button.convert(button.bounds, to: nil))
+    }
+
+    private func installDismissMonitors() {
+        let mask: NSEvent.EventTypeMask = [.leftMouseDown, .rightMouseDown]
+        // 상태 아이템 클릭은 시스템 쪽 창이라 전역 이벤트로 온다 — 토글 액션이 처리하게 둔다.
+        if let global = NSEvent.addGlobalMonitorForEvents(matching: mask, handler: { [weak self] _ in
+            Task { @MainActor in
+                guard let self, !self.statusButtonFrame().contains(NSEvent.mouseLocation) else { return }
+                self.closePopover()
+            }
+        }) { monitors.append(global) }
+        if let local = NSEvent.addLocalMonitorForEvents(matching: mask, handler: { [weak self] event in
+            guard let self, let panel = self.panel else { return event }
+            // 패널 안, 그리고 상태 아이템(토글 액션이 처리)은 그대로 통과시킨다.
+            if event.window !== panel, event.window !== self.statusItem.button?.window { self.closePopover() }
+            return event
+        }) { monitors.append(local) }
+        resignObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didResignActiveNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.closePopover() }
+        }
+    }
+
+    private func closePopover() {
+        guard let panel else { return }
+        monitors.forEach(NSEvent.removeMonitor)
+        monitors = []
+        if let resignObserver { NotificationCenter.default.removeObserver(resignObserver) }
+        resignObserver = nil
+        statusItem.button?.highlight(false)
+        panel.orderOut(nil)
+        panel.contentView = nil
+        hosting = nil
+        self.panel = nil
     }
 }
