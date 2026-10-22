@@ -6,7 +6,7 @@ struct PopoverView: View {
     let openSettings: () -> Void
 
     var body: some View {
-        // 제어 센터처럼: 바깥 판도, 모듈 하나하나도 맑은 유리 조각.
+        // 제어 센터처럼: 바깥 판도, 모듈 하나하나도 맑은 유리 조각. 판 뒤엔 dim 층.
         GlassEffectContainer(spacing: 10) {
             VStack(alignment: .leading, spacing: 10) {
                 if model.memoryLevel == .danger {
@@ -24,6 +24,7 @@ struct PopoverView: View {
         .frame(width: 380)
         .monospacedDigit()
         .glassEffect(Theme.popoverGlass, in: .rect(cornerRadius: Theme.popoverRadius, style: .continuous))
+        .background(Theme.popoverDim, in: .rect(cornerRadius: Theme.popoverRadius, style: .continuous))
         .preferredColorScheme(.dark)
     }
 }
