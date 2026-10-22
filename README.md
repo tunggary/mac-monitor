@@ -14,7 +14,7 @@
 </div>
 
 <p align="center">
-  <img src="docs/images/popover.png" alt="Liquid Glass 팝오버: CPU·메모리·스왑 그래프와 메모리 상위 앱 5개" width="380">
+  <img src="docs/images/popover.png" alt="CPU·메모리·스왑 그래프와 메모리 상위 앱 5개를 보여주는 팝오버" width="380">
 </p>
 
 ## 주요 기능
@@ -30,7 +30,7 @@
 
 ### 메뉴바 앵무새
 
-메뉴바에 숫자 대신 파티 앵무새가 있습니다. 맥이 한가하면 느긋하게, CPU를 많이 쓰면 정신없이 춤춥니다. 앵무새를 누르면 팝오버가 열립니다. 팝오버는 제어 센터처럼 투명한 Liquid Glass로 그리고, 평소엔 무채색이다가 주의·위험일 때만 색이 나타납니다.
+메뉴바에 숫자 대신 파티 앵무새가 있습니다. 맥이 한가하면 느긋하게, CPU를 많이 쓰면 정신없이 춤춥니다. 앵무새를 누르면 팝오버가 열립니다.
 
 ### 시스템 그래프
 
@@ -124,7 +124,7 @@ xcodebuild -project MacMonitor.xcodeproj -scheme MacMonitor -derivedDataPath bui
 | `MacMonitor/Kill` | 종료·강제종료 |
 | `MacMonitor/Alerts` | 알림 조건과 알림 보내기 |
 | `MacMonitor/Settings` | 설정 창, 로그인 시 실행 |
-| `MacMonitor/Theme` | 유리·색 토큰 (Liquid Glass, 시스템 색) |
+| `MacMonitor/Theme` | 색 토큰 |
 | `design/` | 화면 시안 HTML, 앵무새 원본 프레임 |
 | `scripts/make-app-icon.swift` | 번개 앱 아이콘 생성 |
 
