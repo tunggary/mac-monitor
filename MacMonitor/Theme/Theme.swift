@@ -35,9 +35,12 @@ enum Theme {
     static let graphTintedAreaTop = 0.32
     static let graphRuleOpacity = 0.6
 
-    // MARK: 유리 — 제어 센터처럼 바깥 판과 모듈 모두 맑은(clear) 유리
+    // MARK: 유리 — 제어 센터처럼 바깥 판과 모듈 모두 맑은(clear) 유리.
+    // clear 는 배경 밝기에 적응하지 않아 밝은 배경에서 하얗게 뜬다. 판 뒤에 검은 dim 층을 깔아 막는다.
+    // (regular 는 밝기엔 적응하지만 배경을 뿌옇게 갈아 탁해 보인다.)
     static let popoverRadius: CGFloat = 26
     static let popoverGlass: Glass = .clear
+    static let popoverDim = Color.black.opacity(0.5)
     static let moduleGlass: Glass = .clear
 
     // MARK: 크기
