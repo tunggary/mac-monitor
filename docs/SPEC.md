@@ -32,14 +32,14 @@
 - 메모리 % = (앱 메모리 + 와이어드 + 압축됨) / hw.memsize
 - 사용 가능 % = kern.memorystatus_level (memory_pressure 의 "System-wide memory free percentage" 와 같은 값)
 - 압력 % = 100 − 사용 가능 %
-- 압력 칩 색·문구 = 메모리 상태(정상/주의/위험): "압력 정상 31%"
+- 압력 상태 라벨 색·문구 = 메모리 상태(정상/주의/위험): "압력 정상 31%"
 
 ## 상태 판정 (기준은 설정에서 변경)
 - 메모리 주의: 스왑 > 4 GB → 팝오버에 주의 표시, 알림 없음
 - 메모리 위험: 스왑 > 8 GB 또는 사용 가능 메모리 < 20% → 팝오버 위험 배너 + 알림
 - CPU 급증(주의): 한 앱(그룹)이 CPU ≥ 300%를 30초 넘게 지속 → 알림
-- CPU 칩: 어떤 앱이든 CPU ≥ 300%(앱 CPU 주의 기준)면 "CPU 주의"(노랑), 아니면 "CPU 정상"(초록)
-- 앱 행 상태 점: 메모리 위험 → 1위 원인 앱 코랄, 2·3위 노랑 / 메모리 주의 → 1~3위 노랑 / CPU ≥ 300% 앱은 메모리 상태와 상관없이 노랑(코랄이 우선) / 나머지 초록
+- CPU 상태 라벨: 어떤 앱이든 CPU ≥ 300%(앱 CPU 주의 기준)면 "주의"(노랑), 아니면 "정상"(초록 점 + 회색 글자)
+- 앱 행 상태 점: 메모리 위험 → 1위 원인 앱 빨강, 2·3위 노랑 / 메모리 주의 → 1~3위 노랑 / CPU ≥ 300% 앱은 메모리 상태와 상관없이 노랑(빨강이 우선) / 나머지는 점 없음
   ("원인" = 메모리 footprint 큰 순)
 
 ## 메뉴바 아이콘 — 파티 앵무새
@@ -50,24 +50,28 @@
 - 흰색 고정이라 밝은 메뉴바에서는 잘 안 보일 수 있다(알려진 한계).
 - 캐릭터 교체 가능한 구조: Character 프로토콜(이름, 상태별 프레임 배열, 속도 범위). 지금은 파티 앵무새 하나.
 
-## 팝오버 (아이콘 클릭) — NSPopover + SwiftUI, 폭 380, 시안 Main / Danger
-배경 surface, 테두리 line-strong 1px, radius 12, padding 16, 섹션 gap 14. 폰트 시스템(SF Pro), 숫자 tabular-nums(.monospacedDigit()).
-1. (메모리 위험일 때만) 상단 배너: danger 16% 배경, radius 10, padding 10×12, 경고 삼각형 18px.
-   제목 13 semibold "메모리 위험 — 스왑 12.7 GB", 본문 12 text-2 "경고 기준 8 GB를 4분째 넘고 있어요. 가장 큰 원인은 Aside(20.7 GB)예요."
+## 팝오버 (아이콘 클릭) — 투명 NSPanel + SwiftUI Liquid Glass, 폭 380 (2026-10-22 변경 — 이전 NSPopover + 불투명 surface 배경을 대체)
+- 창: 테두리 없는 NSPanel(투명 배경, 창 그림자 끔 — 사각 그림자가 둥근 유리 밖에 비침). 상태 아이템 아래 중앙 6pt, 화면 밖이면 안쪽으로(여백 8). 꼬리(화살표) 없음. 내용 높이가 바뀌면 위쪽 고정으로 늘어난다.
+  닫기: 상태 아이템 재클릭 · ESC · 패널 밖 클릭 · 앱 비활성화. 닫으면 SwiftUI 뷰를 버린다.
+- 유리: 제어 센터처럼 바깥 판과 모듈 모두 맑은 유리 `.glassEffect(.clear)`, GlassEffectContainer(spacing 10)로 묶는다. 바깥 판 radius 26, 모듈 radius 18. 모듈에 별도 면 색을 깔지 않는다(뿌옇게 겹침).
+- 레이아웃: padding 12, 모듈 gap 10. 폰트 시스템(SF Pro), 숫자 tabular-nums(.monospacedDigit()). 글자는 .primary(흰 85%) / .secondary(55%)만 쓴다.
+1. (메모리 위험일 때만) 상단 배너: red 55% 면, radius 18, padding 12×14, 흰 경고 삼각형 18px(느낌표는 어두운 red).
+   제목 13 semibold 흰색 "메모리 위험 — 스왑 12.7 GB", 본문 12 흰색 90% "경고 기준 8 GB를 4분째 넘고 있어요. 가장 큰 원인은 Aside(20.7 GB)예요."
    사용 가능 메모리가 원인이면: 제목 "메모리 위험 — 사용 가능 18%" / 본문 "경고 기준 20%보다 4분째 적어요. 가장 큰 원인은 Aside(20.7 GB)예요." 둘 다 해당하면 스왑 문구 우선.
    "N분째"는 앱이 위험을 처음 감지한 시각부터(최소 1분 표기).
-2. "시스템"(13 semibold text-2) + 범위 토글 1분 / 10분(기본) / 1시간 (세그먼트: surface-2 배경 radius 7 padding 2 gap 2, 버튼 12px padding 4×10 radius 5, 선택 = surface-3 배경 + accent 글자 semibold)
-3. CPU: "CPU 18.2%" 20 semibold(수치는 cpu 색) + 오른쪽 상태 칩 / 아랫줄 12 text-2 "시스템 6.4% · 사용자 11.8% · 대기 81.8%" / 영역 그래프 높이 56
-4. (구분선 1px line) 메모리: "메모리 63.9%" 20 semibold + 칩 "압력 정상 31%" / 3열(앱 메모리·와이어드·압축됨, 라벨 12 text-2, 값 14 text) / 그래프 높이 48
-5. 스왑: "스왑 1.2 GB" 14 semibold(수치 swap 색) + 오른쪽 12 "주의 4 GB · 위험 8 GB"(각각 warn/danger 색, 초과 시 "위험 8 GB 초과" semibold) / 그래프 높이 40, warn·danger 점선 기준선 2개(1px, dash 4 4, opacity 0.7)
-6. (구분선) 상위 앱 5개: "상위 앱" + 정렬 토글 메모리/CPU (버튼 padding 3×10)
-   행: padding 8 상하좌우, gap 10, 아이콘 28×28 radius 7(앱 아이콘, 없으면 surface-3 배경에 이니셜), 이름 13 / 부가정보 11 text-3 (말줄임), 상태 점 8×8, 값 13, 종료 × 버튼 28×28(아이콘 14, text-3)
-   행 클릭 → 펼침: surface-2 배경 radius 10 컨테이너. 펼침 화살표 없음. 하위 행은 이름 시작 위치(왼쪽 46px)에 정렬, padding 6 8 6 46, 이름 12 / 부가 11 text-3 / 값 12 text-2 / × 26×26(아이콘 12).
-   펼쳐도 상위 행은 같은 × 버튼(앱 전체 종료) 유지(2026-10-20 변경 — 시안의 "종료" 글자 버튼 대신). 상위 앱 목록은 접힌 행 5개 높이의 고정 스크롤 영역. 펼친 내용은 그 행 바로 아래에 끼워 넣고(아래 행은 목록 안에서만 내려감), 펼치면 보이도록 자동 스크롤. 시스템 스크롤 막대는 숨기고(폭을 차지해 행이 밀림) 목록 위에 겹친 3pt 막대(text-3 60%)로 표시. 팝오버 높이·하단 바는 불변(2026-10-20 변경 — 이전 "겹쳐 그리기"는 아래쪽 행에서 하단 바와 겹치는 버그가 있었음).
+2. "시스템"(13 semibold secondary) + 범위 토글 1분 / 10분(기본) / 1시간 (세그먼트: 캡슐 트랙 white 6% padding 3 gap 2, 버튼 12px 가로 11, 선택 = white 24% 캡슐 + primary semibold)
+3. CPU 모듈: "CPU"(12 semibold secondary) + 오른쪽 상태 라벨 / 큰 숫자 30 semibold + "%" 18 secondary / 12 secondary "시스템 6.4% · 사용자 11.8% · 대기 81.8%" / 그래프 높이 52
+4. 메모리 모듈: "메모리" + 상태 라벨 "압력 정상 31%" / 큰 숫자 / 3열(앱 메모리·와이어드·압축됨, 라벨 11 secondary, 값 14 medium) / 그래프 높이 44
+5. 스왑 모듈: "스왑" 12 semibold secondary + 값 17 semibold / 오른쪽 11 secondary "주의 4 GB · 위험 8 GB"(위험 초과 시 "위험 8 GB 초과"만 red semibold) / 그래프 높이 30, 주의(yellow)·위험(red) 점선 기준선(1px, dash 3 4, opacity 0.6)
+6. 상위 앱 모듈 5개: "상위 앱" + 정렬 토글 메모리/CPU
+   행: padding 7 8 7 6, gap 10, 아이콘 30×30 radius 8(앱 아이콘, 없으면 white 14% 면에 이니셜), 이름 13 medium / 부가정보 11 secondary (말줄임), 상태 점 7×7, 값 13 medium, 종료 × 원형 28×28(hover white 14%). hover 시 행 white 8% radius 12.
+   행 클릭 → 펼침: white 7% 면 radius 14. 펼침 화살표 없음. 하위 행은 왼쪽 48 들여쓰기, 이름 12 / 부가 11 secondary / 값 12 secondary / × 26×26.
+   펼쳐도 상위 행은 같은 × 버튼(앱 전체 종료) 유지(2026-10-20 변경 — 시안의 "종료" 글자 버튼 대신). 상위 앱 목록은 접힌 행 5개 높이의 고정 스크롤 영역. 펼친 내용은 그 행 바로 아래에 끼워 넣고(아래 행은 목록 안에서만 내려감), 펼치면 보이도록 자동 스크롤. 시스템 스크롤 막대는 숨기고(폭을 차지해 행이 밀림) 목록 위에 겹친 3pt 막대(white 35%)로 표시. 하단 바는 불변(2026-10-20 변경 — 이전 "겹쳐 그리기"는 아래쪽 행에서 하단 바와 겹치는 버그가 있었음).
    부가정보: GUI 앱 "프로세스 42개" (위험 시 "프로세스 123개 · CPU 112%"), CLI "next-server · 1pm_clinic_web-new-work-1018 · :3110" 형태에서 이름 뒤 부분 = "cwd폴더명 · :포트"
    하위 행: 같은 실행 파일 이름끼리 묶어 메모리 상위 3줄 + "그 외 N개"(부가: "Helper (GPU) 외"). 묶인 줄 부가 "96개", × 는 그 줄의 프로세스 전체에 신호.
-7. 하단(border-top line, padding-top 6): "측정 1초 · 앱 목록 3초"(11 text-3), 설정(톱니 16) 버튼, "앱 종료" 버튼.
-- 그래프: Swift Charts AreaMark(24%) + LineMark(100%, 1.5px). 1시간 범위는 다운샘플링해서 점 수를 그래프 폭(~348) 이하로.
+   강제종료 확인 박스: black 22% 면 radius 14. 버튼 "취소" `.glass`, "강제종료" `.glassProminent` + red tint.
+7. 하단: "측정 1초 · 앱 목록 3초"(11 secondary), 설정(톱니, 원형 30) 버튼, "앱 종료"(캡슐 높이 30) 버튼 — 둘 다 `.buttonStyle(.glass)`.
+- 그래프: Swift Charts AreaMark(위→아래 그라디언트) + LineMark(1.5px). 정상은 흰색(선 white 85%, 면 white 28%→0), 상태가 주의·위험이면 그 색(면 32%→0). 1시간 범위는 다운샘플링해서 점 수를 그래프 폭 이하로.
 
 ## 앱 묶기 규칙
 - GUI 앱은 .app 번들 단위로 합산 (Aside Helper ×96 → Aside). responsible pid → NSRunningApplication / 실행 경로에서 가장 바깥 .app 번들.
@@ -96,26 +100,24 @@
 - 반복: 기준 초과 시 1회, 계속되면 설정 간격(기본 10분)마다, 정상 복귀 시 초기화. 메모리 위험·CPU 급증 각각 독립.
 
 ## 설정 창 — 시안 Settings (창 제목 "mac-monitor 설정")
-- 일반: 로그인 시 자동 실행 (체크박스)
-- 위험 기준 (각 행 라벨 + 주의/위험 칩 + 힌트 11 text-3 + 숫자 입력 64px + 단위):
+- 창: 바탕은 `.glassEffect(.regular)`(글이 많아 clear 는 뒤 글자와 겹쳐 읽히지 않음), 섹션 카드는 팝오버 모듈과 같은 `.clear` 유리 radius 18. 타이틀바 투명, fullSizeContentView.
+- 일반: 로그인 시 자동 실행 (스위치)
+- 위험 기준 (각 행 라벨 + 주의/위험 상태 라벨 + 힌트 11 secondary + 숫자 입력 64×28 캡슐 + 단위):
   스왑 사용량 [주의] 4 GB "앵무새가 노랑으로 바뀌어요" / 스왑 사용량 [위험] 8 GB "앵무새가 코랄로 바뀌고 알림이 와요" /
   사용 가능 메모리 [위험] 20 % "이 값보다 적으면 위험" / 앱 하나의 CPU [주의] 300 % "코어 1개 = 100%" / CPU 급증 지속 시간 [주의] 30 초 "이만큼 계속되면 알림"
 - 알림: "위험이 계속되면 다시 알림" (힌트 "정상으로 돌아오면 초기화돼요") — 5분마다 / 10분마다(기본) / 30분마다 / 다시 안 함
-- 캐릭터: 3칸 그리드, 파티 앵무새(선택됨, accent 2px 테두리, 움직이는 미리보기) + "추가 예정" 점선 칸 2개(disabled)
+- 캐릭터: 3칸 그리드(높이 84, radius 18), 파티 앵무새(선택됨, accent 2px 테두리, 움직이는 미리보기) + "추가 예정" 점선 칸 2개(disabled)
 - 설정은 UserDefaults. 스왑 주의 ≥ 스왑 위험 입력은 저장하지 않고 입력칸 아래 "주의는 위험보다 작아야 해요" 안내, 이전 값 유지. 사용 가능 메모리 %는 1~99.
 
 ## 단위
 - 용량은 1024 기준(GiB) 값에 "GB" 라벨 (활성 상태 보기·sysctl 과 같은 기준). 스왑 기준 비교도 같은 기준.
 
-## 색 팔레트 — Ink Indigo (Theme.swift 한 곳에 토큰, 화면은 의미 토큰만 참조)
-| 토큰 | 연함 | 기본 | 진함 |
-| brand | #B9BEFF | #7C85FF | #545DE8 |
-| green | #B4EDD2 | #6FD6A8 | #2FA877 |
-| yellow | #FBE3A8 | #F5C96A | #C08A1E |
-| alert | #FFB0A6 | #FF7A6B | #D2453A |
-중립: ground #0D0E12 · surface #15171D · surface-2 #1E2129 · surface-3 #2A2E38 · text #ECEEF3 · text-2 #9AA0AD · text-3 #7D8391 · line white 8% / line-strong white 14% · menubar #08090C
-의미: cpu = brand · mem = brand · swap = brand-연함 · ok = green · warn = yellow · danger = alert · accent(선택·토글·포커스) = brand · 강제종료 버튼 면 = alert-진함(흰 글자)
-규칙: 상태 칩 배경 16%(칩 padding 3×8 radius 10, 12 semibold), 그래프 면 24%. 평소 화면엔 인디고·먹색·초록만, 노랑·코랄은 주의·위험에만(예외: 스왑 기준 점선).
+## 색 — Liquid Glass 규칙 (Theme.swift 한 곳에 토큰, 화면은 의미 토큰만 참조. 2026-10-22 변경 — Ink Indigo 팔레트를 대체)
+근거: Apple HIG Color/Materials — 유리 자체엔 색이 없고 뒤의 색을 받는다. 색은 상태 표시·핵심 버튼에만 아껴 쓰고, 시스템 색을 쓴다.
+- 기본은 무채색: 글자·그래프·아이콘은 .primary / .secondary. 직접 만든 hex 팔레트를 쓰지 않는다.
+- 의미 색 = macOS 시스템 색: ok = .green · warn = .yellow · danger = .red · accent(스위치·포커스·선택 카드) = .accentColor(사용자 강조색)
+- 색을 "면"에 칠하는 곳은 위험 배너와 강제종료 버튼 둘뿐.
+- 평소(정상) 화면은 무채색이고, 주의·위험일 때만 상태 점·그래프·라벨에 색이 나타난다.
 다크 고정(팝오버·설정 창은 .preferredColorScheme(.dark) / NSAppearance darkAqua).
 
 ## 버전 관리 (../git-graph-panel 과 같은 방식)
