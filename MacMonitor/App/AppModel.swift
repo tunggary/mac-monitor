@@ -9,12 +9,13 @@ enum AppSort: Sendable, Equatable {
 actor ProcessMonitor {
     private let sampler = ProcessSampler()
     private let tracker = UsageTracker()
+    private let windowProbe = VisibleWindowProbe()
 
-    func sample() -> (groups: [AppGroup], signals: [String: UsageSignals]) {
+    func sample() -> (groups: [AppGroup], signals: [String: UsageSignals], visiblePids: Set<Int32>) {
         let now = Date()
         let samples = sampler.sample(now: now)
         let groups = Grouping.group(samples, selfPid: getpid(), currentUID: getuid())
-        return (groups, tracker.update(samples: samples, groups: groups, now: now))
+        return (groups, tracker.update(samples: samples, groups: groups, now: now), windowProbe.visiblePids(now: now))
     }
 }
 
@@ -57,6 +58,7 @@ final class AppModel {
     @ObservationIgnored private var swapBuffer = RingBuffer<Double>()
     @ObservationIgnored private let systemSampler = SystemSampler()
     @ObservationIgnored private let processMonitor = ProcessMonitor()
+    @ObservationIgnored private lazy var activations = ActivationRecorder()
     @ObservationIgnored private var tasks: [Task<Void, Never>] = []
     /// 메뉴바 쪽이 상태 변화를 받는 훅 (뷰가 아니라 관찰 불필요)
     @ObservationIgnored var onUpdate: (() -> Void)?
@@ -121,6 +123,7 @@ final class AppModel {
 
     func start() {
         guard tasks.isEmpty else { return }
+        _ = activations // 모니터 시작 시각·현재 앞 앱을 지금 기록한다
         Task { [auditLog] in await auditLog.pruneIfDue() }
         kill.onConfirmShown = { [weak self] groupID in
             self?.expandedID = groupID
@@ -137,7 +140,7 @@ final class AppModel {
             while !Task.isCancelled {
                 guard let monitor = self?.processMonitor else { return }
                 let result = await monitor.sample()
-                self?.apply(groups: result.groups, signals: result.signals)
+                self?.apply(groups: result.groups, signals: result.signals, visiblePids: result.visiblePids)
                 try? await Task.sleep(for: .seconds(3), tolerance: .milliseconds(500))
             }
         })
@@ -218,9 +221,18 @@ final class AppModel {
         ))
     }
 
-    private func apply(groups: [AppGroup], signals: [String: UsageSignals]) {
+    private func apply(groups: [AppGroup], signals: [String: UsageSignals], visiblePids: Set<Int32>) {
         self.groups = groups
-        usageSignals = signals
+        let now = Date()
+        let recorder = activations
+        let byID = Dictionary(groups.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        usageSignals = signals.reduce(into: [:]) { result, entry in
+            guard let group = byID[entry.key] else { return result[entry.key] = entry.value }
+            result[entry.key] = entry.value.enriched(
+                bundlePath: group.bundlePath, pids: group.pids, activations: recorder.activations,
+                monitorStart: recorder.startDate, visiblePids: visiblePids, now: now
+            )
+        }
         let ids = Set(groups.map(\.id))
         if let expandedID, !ids.contains(expandedID) { self.expandedID = nil }
         kill.prune(existingGroupIDs: ids)

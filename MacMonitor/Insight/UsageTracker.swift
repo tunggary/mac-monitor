@@ -52,7 +52,7 @@ final class UsageTracker {
         for group in groups {
             let members = group.pids.compactMap { byPid[$0] }
             guard !members.isEmpty else { continue }
-            result[group.id] = signals(group: group, members: members, orphans: orphans, now: now)
+            result[group.id] = signals(group: group, members: members, byPid: byPid, orphans: orphans, now: now)
         }
 
         let ids = Set(result.keys)
@@ -61,7 +61,7 @@ final class UsageTracker {
         return result
     }
 
-    private func signals(group: AppGroup, members: [ProcessSample], orphans: [Int32: String?], now: Date) -> UsageSignals {
+    private func signals(group: AppGroup, members: [ProcessSample], byPid: [Int32: ProcessSample], orphans: [Int32: String?], now: Date) -> UsageSignals {
         let established = members.reduce(0) { $0 + $1.establishedConnections }
 
         var idle: TimeInterval = 0
@@ -82,7 +82,9 @@ final class UsageTracker {
         let oldest = members.compactMap(\.startDate).min()
         let sameName = Dictionary(grouping: members, by: \.name).values.map(\.count).max() ?? 0
 
-        return UsageSignals(
+        let live = group.kind != .app && !isOrphan ? closestAncestor(of: representative, byPid: byPid) : nil
+
+        var signals = UsageSignals(
             groupID: group.id, displayName: group.displayName, kind: group.kind,
             executablePath: representative.path, arguments: representative.arguments, cwd: representative.cwd,
             ports: group.ports, establishedConnections: established, processCount: group.processCount,
@@ -91,6 +93,8 @@ final class UsageTracker {
             footprint: group.footprint, footprintGrowthPercent: growth.percent, footprintMonotonic: growth.monotonic,
             cpuPercent: group.cpuPercent
         )
+        signals.liveAncestor = live
+        return signals
     }
 
     /// 1분 간격 이력에 쌓고 30분 전 대비 증가율을 돌려준다. 이력이 30분이 안 되면 percent 는 nil.

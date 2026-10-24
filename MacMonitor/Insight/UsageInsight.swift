@@ -34,6 +34,15 @@ struct UsageSignals: Sendable, Equatable {
     /// 30분 동안 footprint 가 줄어든 적 없이 늘었는지
     var footprintMonotonic: Bool
     var cpuPercent: Double
+    /// GUI 앱이 마지막으로 앞에 활성화된 지 경과. 모니터 시작 이후 한 번도 못 봤으면 (지금 - 모니터 시작).
+    /// CLI·process 그룹은 nil. 활성화 정보는 AppModel 이 `enriched` 로 채운다.
+    var lastActiveSeconds: TimeInterval?
+    /// 모니터 시작 이후 활성화(앞에 옴)를 한 번이라도 봤는지. false 면 `lastActiveSeconds` 는 "최소 이만큼"이다.
+    var activeSinceMonitorStart = false
+    /// 그룹의 pid 중 하나라도 화면에 보이는 일반(layer 0) 창을 가졌는지. CLI·process 그룹은 nil.
+    var hasVisibleWindow: Bool?
+    /// 고아가 아닌 CLI·process 그룹에서, 대표 프로세스의 조상 체인에 지금 살아 있는 claude·codex·터미널·셸 이름 (에이전트 우선).
+    var liveAncestor: String?
 }
 
 /// 규칙 1차 판정 결과

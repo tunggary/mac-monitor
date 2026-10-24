@@ -171,6 +171,45 @@ struct UsageTrackerTests {
         #expect(signals?.lostAncestor == nil)
     }
 
+    // MARK: 살아 있는 조상
+
+    @Test func liveAncestorIsAgentOverShell() {
+        let tracker = UsageTracker()
+        let claude = proc(5, ppid: 3, name: "2.1.302", path: "/Users/u/.local/share/claude/versions/2.1.302")
+        let shell = proc(6, ppid: 5, name: "zsh", path: "/bin/zsh")
+        let child = proc(10, ppid: 6)
+        let signals = tracker.update(samples: [claude, shell, child], groups: [group("g", [child])], now: t0)["g"]
+        #expect(signals?.isOrphan == false)
+        #expect(signals?.liveAncestor == "claude")
+    }
+
+    @Test func liveAncestorFallsBackToNearestShell() {
+        let tracker = UsageTracker()
+        let terminal = proc(2, name: "cmux", path: cmuxPath)
+        let shell = proc(3, ppid: 2, name: "zsh", path: "/bin/zsh")
+        let child = proc(10, ppid: 3)
+        #expect(tracker.update(samples: [terminal, shell, child], groups: [group("g", [child])], now: t0)["g"]?.liveAncestor == "zsh")
+    }
+
+    @Test func orphanAndAppGroupsHaveNoLiveAncestor() {
+        let tracker = UsageTracker()
+        #expect(run(tracker, [proc(10)], at: 0)?.liveAncestor == nil)
+        let parent = proc(5, name: "claude", path: "/x/claude")
+        let child = proc(11, ppid: 5)
+        let result = tracker.update(samples: [parent, child], groups: [group("a", kind: .app, [child])], now: t0)
+        #expect(result["a"]?.liveAncestor == nil)
+    }
+
+    @Test func liveAncestorClearsAfterParentDies() {
+        let tracker = UsageTracker()
+        let parent = proc(5, name: "codex", path: "/usr/local/bin/codex")
+        let child = proc(10, ppid: 5)
+        #expect(tracker.update(samples: [parent, child], groups: [group("g", [child])], now: t0)["g"]?.liveAncestor == "codex")
+        let after = run(tracker, [proc(10, ppid: 1)], at: 3)
+        #expect(after?.liveAncestor == nil)
+        #expect(after?.lostAncestor == "codex")
+    }
+
     // MARK: 대표값·정리
 
     @Test func representativeAndCounts() {
