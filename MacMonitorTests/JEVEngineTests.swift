@@ -23,6 +23,12 @@ struct JEVEngineTests {
         let criteria = try #require(verdict["criteria"] as? [String: String])
         #expect(Set(criteria.keys) == ["종료 추천", "관심 필요", "정상"])
         #expect((questions["data_loss"] as? [String: Any])?["type"] as? String == "noul")
+        #expect((verdict["instructions"] as? String)?.hasPrefix("The state lists facts about a process group") == true)
+        #expect(criteria["종료 추천"]?.hasPrefix("The user is not using it and quitting it loses nothing") == true)
+        #expect(criteria["관심 필요"]?.hasPrefix("Not safe to quit blindly") == true)
+        #expect(criteria["정상"]?.hasPrefix("In use right now") == true)
+        let loss = try #require((questions["data_loss"] as? [String: Any])?["instructions"] as? String)
+        #expect(loss.hasPrefix("Would terminating this process lose data or interrupt work"))
     }
 
     @Test func dataLossOnlyRequestHasOneQuestion() throws {

@@ -80,7 +80,7 @@ actor VerdictService {
 
         let outcomes = await withTaskGroup(of: (Int, Result<EngineReply, Error>, Int).self) { group in
             for (index, item) in pending.enumerated() {
-                let state = Redactor.stateJSON(item.signals)
+                let state = Redactor.stateText(item.signals)
                 group.addTask {
                     let start = ContinuousClock.now
                     let reply: Result<EngineReply, Error>

@@ -61,17 +61,17 @@ struct JEVEngine: VerdictEngine {
 
     static var verdictQuestion: [String: Any] { [
         "type": "choice",
-        "instructions": "A process group is using memory on a macOS developer's Mac. Based on the state, decide whether the user can safely terminate it to free memory. 이 프로세스 그룹을 종료해도 되는지 판단하라.",
+        "instructions": "The state lists facts about a process group that is using memory on a developer's Mac. Decide which tag to show the user: terminate recommended, needs attention, or normal. 이 프로세스 그룹에 어떤 태그를 붙일지 판정하라.",
         "criteria": [
-            "종료 추천": "Safe to terminate: a leftover or orphaned dev server or tool whose launcher (terminal, agent, shell) is gone, idle with no connections for a long time. 띄운 쪽이 사라졌고 오래 한가해서 종료해도 되는 프로세스.",
-            "관심 필요": "Worth the user's attention but not clearly safe to kill: unclear purpose, growing memory, or possibly still needed. 사용자가 직접 확인해볼 만한 프로세스.",
-            "정상": "Normal: actively used, has live connections or CPU activity, or an app the user is working with. 지금 쓰이고 있는 정상 프로세스.",
+            "종료 추천": "The user is not using it and quitting it loses nothing: the session or terminal that launched it has ended, or it has had no visible window and no activity for hours. Not a database or running job. 사용자가 쓰지 않고, 종료해도 잃을 것이 없다.",
+            "관심 필요": "Not safe to quit blindly: it holds data (database, unsaved work, long job), or its memory keeps growing, or its purpose is unclear. 종료 전에 사용자가 직접 확인해야 한다.",
+            "정상": "In use right now: a visible window was brought to front recently, it has live network connections or sustained CPU from a running task, or the terminal that launched it is still alive. 지금 쓰이고 있다.",
         ],
     ] }
 
     static var dataLossQuestion: [String: Any] { [
         "type": "noul",
-        "instructions": "Is this a process that would lose data or be hard to recover if terminated (e.g. a database, an editor with unsaved work, a running build or migration)? DB처럼 종료하면 데이터를 잃거나 복구가 어려운 프로세스인가?",
+        "instructions": "Would terminating this process lose data or interrupt work that is hard to recover (a database, unsaved work, a running build, training job or migration)? 종료하면 데이터를 잃거나 진행 중인 작업이 날아가는가?",
     ] }
 
     static func requestBody(state: String, mode: VerdictMode) throws -> Data {
