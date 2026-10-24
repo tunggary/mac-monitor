@@ -4,6 +4,7 @@ import SwiftUI
 /// "AI 판정" 섹션: 스위치 + (켜면) 엔진 선택·API 키
 struct AIVerdictSection: View {
     @Bindable var model: AppModel
+    var openAuditLog: () -> Void = {}
 
     private enum Check { case none, checking, connected, invalid, saveFailed }
 
@@ -43,6 +44,9 @@ struct AIVerdictSection: View {
                             .padding(.bottom, 10)
                     }
                 }
+                // 기록은 꺼져 있어도 지난 호출을 볼 수 있게 항상 보인다
+                Rectangle().fill(Theme.divider).frame(height: 1)
+                auditLogRow
             }
             .settingsCard()
         }
@@ -52,6 +56,29 @@ struct AIVerdictSection: View {
             check = .none
             refreshHasKey()
         }
+    }
+
+    private var auditLogRow: some View {
+        Button(action: openAuditLog) {
+            HStack {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("판정 기록")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.primary)
+                    Text("엔진에 보낸 요청과 응답을 봐요")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint("새 창에서 열기")
     }
 
     private var engineRow: some View {

@@ -4,6 +4,7 @@ import SwiftUI
 /// 설정 창 내용 (시안 Settings). 값은 바꾸는 즉시 model.settings 에 반영된다.
 struct SettingsView: View {
     @Bindable var model: AppModel
+    var openAuditLog: () -> Void = {}
 
     private static let titlebarHeight: CGFloat = 28
 
@@ -18,8 +19,7 @@ struct SettingsView: View {
                 GeneralSection()
                 ThresholdSection(model: model)
                 NotificationSection(model: model)
-                AIVerdictSection(model: model)
-                AuditLogSection(model: model)
+                AIVerdictSection(model: model, openAuditLog: openAuditLog)
                 CharacterSection()
             }
             .padding(.horizontal, 24)
