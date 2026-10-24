@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import MacMonitor
 
@@ -202,5 +203,51 @@ struct DisplayNameTests {
     @Test func versionNameWithoutUsablePathKeepsName() {
         #expect(Grouping.displayName(name: "2.1.302", path: nil) == "2.1.302")
         #expect(Grouping.displayName(name: "2.1.302", path: "/versions/2.1.302") == "2.1.302")
+    }
+}
+
+struct DockerVMGroupingTests {
+    private let vm = "/System/Library/Frameworks/Virtualization.framework/Versions/A/XPCServices/com.apple.Virtualization.VirtualMachine.xpc/Contents/MacOS/com.apple.Virtualization.VirtualMachine"
+    private let docker = "/Applications/Docker.app/Contents/MacOS/com.docker.virtualization"
+
+    private func group(_ samples: [ProcessSample]) -> [AppGroup] {
+        Grouping.group(samples, selfPid: 99_999, currentUID: 501)
+    }
+
+    @Test func vmJoinsDockerWhenDockerVirtualizationRuns() {
+        let groups = group([
+            ProcessSample(pid: 10, name: "com.docker.virtualization", path: docker, footprint: 10),
+            ProcessSample(pid: 11, name: "com.apple.Virtualization.VirtualMachine", path: vm, footprint: 4000),
+        ])
+        #expect(groups.count == 1)
+        #expect(groups[0].id == "/Applications/Docker.app")
+        #expect(groups[0].processCount == 2)
+    }
+
+    @Test func vmStaysSeparateWithoutDocker() {
+        let groups = group([ProcessSample(pid: 11, name: "com.apple.Virtualization.VirtualMachine", path: vm, footprint: 4000)])
+        #expect(groups.count == 1)
+        #expect(groups[0].kind == .process)
+    }
+}
+
+struct ProcessArgsTests {
+    private func buffer(argc: Int32, path: String, padding: Int, args: [String], env: [String] = []) -> [UInt8] {
+        var bytes = withUnsafeBytes(of: argc.littleEndian) { Array($0) }
+        bytes += Array(path.utf8) + [0] + [UInt8](repeating: 0, count: padding)
+        for item in args + env { bytes += Array(item.utf8) + [0] }
+        return bytes
+    }
+
+    @Test func parsesArgvAndSkipsEnvironment() {
+        let bytes = buffer(argc: 3, path: "/bin/node", padding: 3, args: ["node", "server.js", "--port=3000"], env: ["HOME=/Users/x"])
+        #expect(ProcessArgs.parse(bytes) == ["node", "server.js", "--port=3000"])
+    }
+
+    @Test func truncatedOrEmptyBuffers() {
+        #expect(ProcessArgs.parse([]) == [])
+        #expect(ProcessArgs.parse([1, 0, 0]) == [])
+        #expect(ProcessArgs.parse(buffer(argc: 0, path: "/x", padding: 0, args: [])) == [])
+        #expect(ProcessArgs.parse(buffer(argc: 5, path: "/x", padding: 1, args: ["a", "b"])) == ["a", "b"])
     }
 }
