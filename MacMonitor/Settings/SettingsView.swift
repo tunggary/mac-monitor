@@ -7,18 +7,29 @@ struct SettingsView: View {
 
     private static let titlebarHeight: CGFloat = 28
 
+    /// 스크롤 영역 높이 상한: 화면 작업 영역에서 창 틀 여백을 뺀 값
+    private static var maxHeight: CGFloat { (NSScreen.main?.visibleFrame.height ?? 800) - 40 }
+
+    @State private var contentHeight: CGFloat = 640
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 22) {
-            GeneralSection()
-            ThresholdSection(model: model)
-            NotificationSection(model: model)
-            CharacterSection()
+        ScrollView {
+            VStack(alignment: .leading, spacing: 22) {
+                GeneralSection()
+                ThresholdSection(model: model)
+                NotificationSection(model: model)
+                AIVerdictSection(model: model)
+                AuditLogSection(model: model)
+                CharacterSection()
+            }
+            .padding(.horizontal, 24)
+            .padding(.bottom, 20)
+            // fullSizeContentView 라 내용이 타이틀바 밑으로 들어간다. 타이틀바(28) 만큼 위 여백을 직접 둔다.
+            .padding(.top, 20 + Self.titlebarHeight)
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
         }
-        .padding(.horizontal, 24)
-        .padding(.bottom, 20)
-        // fullSizeContentView 라 내용이 타이틀바 밑으로 들어간다. 타이틀바(28) 만큼 위 여백을 직접 둔다.
-        .padding(.top, 20 + Self.titlebarHeight)
-        .frame(width: 552)
+        // 내용이 화면보다 길어지면 스크롤된다.
+        .frame(width: 552, height: min(contentHeight, Self.maxHeight))
         // 유리는 타이틀바·하단 안전 영역까지 창 전체를 덮는다.
         .background { Color.clear.glassEffect(.regular, in: .rect(cornerRadius: 0)).padding(.bottom, -60).ignoresSafeArea() }
         .ignoresSafeArea()
@@ -27,7 +38,7 @@ struct SettingsView: View {
     }
 }
 
-private struct SettingsSection<Content: View>: View {
+struct SettingsSection<Content: View>: View {
     let title: String
     @ViewBuilder var content: Content
 
@@ -42,7 +53,7 @@ private struct SettingsSection<Content: View>: View {
     }
 }
 
-private extension View {
+extension View {
     /// 섹션 카드: 팝오버 모듈과 같은 맑은 유리, radius 18, 가로 padding 16
     func settingsCard() -> some View {
         padding(.horizontal, 16)

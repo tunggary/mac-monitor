@@ -255,6 +255,7 @@ private struct TopAppsSection: View {
     var body: some View {
         let _ = model.tick
         let dots = model.rowDots
+        let tags = model.rowTags
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text("상위 앱")
@@ -272,7 +273,7 @@ private struct TopAppsSection: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: Self.rowSpacing) {
                         ForEach(model.topApps) { group in
-                            AppRowView(model: model, group: group, dot: dots[group.id] ?? .ok)
+                            AppRowView(model: model, group: group, dot: dots[group.id] ?? .ok, rowTag: tags[group.id])
                                 .id(group.id)
                                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
                                     if model.expandedID != group.id { rowHeight = height }
