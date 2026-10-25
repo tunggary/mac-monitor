@@ -9,6 +9,9 @@ enum Theme {
     /// 선택·포커스
     static let accent = Color.accentColor
 
+    /// 태그 배지 배경 (의미 색 위에 얹는 투명도)
+    static let badgeFillOpacity = 0.2
+
     // MARK: 면 (유리 위에 얹는 흰색 투명도)
     static let expandedRowFill = Color.white.opacity(0.07)
     static let hoverFill = Color.white.opacity(0.08)
