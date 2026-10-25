@@ -6,6 +6,7 @@ import SwiftUI
 final class SettingsWindowController: NSObject, NSWindowDelegate {
     private let model: AppModel
     private var window: NSWindow?
+    private lazy var auditLogWindow = AuditLogWindowController(model: model)
 
     init(model: AppModel) {
         self.model = model
@@ -13,7 +14,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
 
     func show() {
         if window == nil {
-            let controller = NSHostingController(rootView: SettingsView(model: model))
+            let controller = NSHostingController(rootView: SettingsView(model: model) { [weak self] in self?.auditLogWindow.show() })
             controller.sizingOptions = [.preferredContentSize]
             let window = NSWindow(contentViewController: controller)
             window.title = "mac-monitor 설정"

@@ -15,11 +15,17 @@ struct ProcessSample: Sendable, Equatable {
     var cpuPercent: Double
     var listenPorts: [UInt16]
     var responsiblePid: Int32?
+    var startDate: Date?
+    /// 실행 인자(argv). 못 읽으면 [].
+    var arguments: [String]
+    /// 같은 프로세스의 리슨 포트에 붙은 ESTABLISHED 연결 수
+    var establishedConnections: Int
 
     init(
         pid: Int32, ppid: Int32 = 1, uid: UInt32 = 501, name: String, path: String? = nil,
         cwd: String? = nil, footprint: UInt64? = nil, cpuPercent: Double = 0,
-        listenPorts: [UInt16] = [], responsiblePid: Int32? = nil
+        listenPorts: [UInt16] = [], responsiblePid: Int32? = nil,
+        startDate: Date? = nil, arguments: [String] = [], establishedConnections: Int = 0
     ) {
         self.pid = pid
         self.ppid = ppid
@@ -31,6 +37,29 @@ struct ProcessSample: Sendable, Equatable {
         self.cpuPercent = cpuPercent
         self.listenPorts = listenPorts
         self.responsiblePid = responsiblePid
+        self.startDate = startDate
+        self.arguments = arguments
+        self.establishedConnections = establishedConnections
+    }
+}
+
+enum ProcessArgs {
+    /// KERN_PROCARGS2 버퍼 → argv. 형식: Int32 argc, 실행 경로 NUL, 패딩 NUL, argv[0..<argc] (각각 NUL 종료), 그 뒤는 환경변수.
+    static func parse(_ bytes: [UInt8]) -> [String] {
+        guard bytes.count > 4 else { return [] }
+        let argc = bytes.prefix(4).enumerated().reduce(0) { $0 | Int($1.element) << (8 * $1.offset) } // little-endian
+        guard argc > 0 else { return [] }
+        var index = 4
+        while index < bytes.count, bytes[index] != 0 { index += 1 } // 실행 경로
+        while index < bytes.count, bytes[index] == 0 { index += 1 } // 패딩
+        var result: [String] = []
+        while result.count < argc, index < bytes.count {
+            var end = index
+            while end < bytes.count, bytes[end] != 0 { end += 1 }
+            result.append(String(decoding: bytes[index..<end], as: UTF8.self))
+            index = end + 1
+        }
+        return result
     }
 }
 
@@ -62,10 +91,12 @@ final class ProcessSampler {
         var path: String?
         var cwd: String?
         var responsiblePid: Int32?
+        var arguments: [String]
     }
 
     private struct PortEntry {
         var ports: [UInt16]
+        var established: Int
         var fetchedAt: TimeInterval
     }
 
@@ -108,7 +139,8 @@ final class ProcessSampler {
                 info = StaticInfo(
                     path: Self.executablePath(pid),
                     cwd: Self.currentDirectory(pid),
-                    responsiblePid: Responsibility.responsiblePid(for: pid)
+                    responsiblePid: Responsibility.responsiblePid(for: pid),
+                    arguments: Self.arguments(pid)
                 )
                 staticCache[key] = info
             }
@@ -131,11 +163,13 @@ final class ProcessSampler {
                 }
             }
 
+            let network = networkInfo(key: key, uid: bsd.pbi_uid, now: now.timeIntervalSince1970)
             results.append(ProcessSample(
                 pid: pid, ppid: Int32(bitPattern: bsd.pbi_ppid), uid: bsd.pbi_uid, name: name,
                 path: info.path, cwd: info.cwd, footprint: footprint, cpuPercent: cpuPercent,
-                listenPorts: listenPorts(key: key, uid: bsd.pbi_uid, now: now.timeIntervalSince1970),
-                responsiblePid: info.responsiblePid
+                listenPorts: network.ports, responsiblePid: info.responsiblePid,
+                startDate: Date(timeIntervalSince1970: Double(key.startSeconds) + Double(key.startMicroseconds) / 1_000_000),
+                arguments: info.arguments, establishedConnections: network.established
             ))
         }
 
@@ -146,15 +180,15 @@ final class ProcessSampler {
         return results
     }
 
-    // MARK: 리슨 포트 (30초 TTL, pid 별로 만료 시점을 어긋나게 해 한 번에 몰리지 않게 한다)
+    // MARK: 리슨 포트 + ESTABLISHED 연결 수 (30초 TTL, pid 별로 만료 시점을 어긋나게 해 한 번에 몰리지 않게 한다)
 
-    private func listenPorts(key: Key, uid: UInt32, now: TimeInterval) -> [UInt16] {
-        guard uid == currentUID else { return [] } // 다른 uid 의 fd 는 읽을 수 없다
+    private func networkInfo(key: Key, uid: UInt32, now: TimeInterval) -> (ports: [UInt16], established: Int) {
+        guard uid == currentUID else { return ([], 0) } // 다른 uid 의 fd 는 읽을 수 없다
         let ttl = Self.portTTL + Double(key.pid % 10)
-        if let entry = portCache[key], now - entry.fetchedAt < ttl { return entry.ports }
-        let ports = Self.readListenPorts(key.pid)
-        portCache[key] = PortEntry(ports: ports, fetchedAt: now)
-        return ports
+        if let entry = portCache[key], now - entry.fetchedAt < ttl { return (entry.ports, entry.established) }
+        let result = Self.readSockets(key.pid)
+        portCache[key] = PortEntry(ports: result.ports, established: result.established, fetchedAt: now)
+        return result
     }
 
     // MARK: libproc 래퍼
@@ -193,27 +227,41 @@ final class ProcessSampler {
         return path.isEmpty ? nil : path
     }
 
-    private static func readListenPorts(_ pid: Int32) -> [UInt16] {
+    /// KERN_PROCARGS2 로 argv 를 읽는다. 다른 uid 등 실패하면 [].
+    private static func arguments(_ pid: Int32) -> [String] {
+        var mib: [Int32] = [CTL_KERN, KERN_PROCARGS2, pid]
+        var size = 0
+        guard sysctl(&mib, 3, nil, &size, nil, 0) == 0, size > 0 else { return [] }
+        var buffer = [UInt8](repeating: 0, count: size)
+        guard sysctl(&mib, 3, &buffer, &size, nil, 0) == 0 else { return [] }
+        return ProcessArgs.parse(Array(buffer.prefix(size)))
+    }
+
+    /// 리슨 포트와, 그 포트로 들어온 ESTABLISHED 연결 수
+    private static func readSockets(_ pid: Int32) -> (ports: [UInt16], established: Int) {
         let listSize = proc_pidinfo(pid, PROC_PIDLISTFDS, 0, nil, 0)
-        guard listSize > 0 else { return [] }
+        guard listSize > 0 else { return ([], 0) }
         let entrySize = MemoryLayout<proc_fdinfo>.size
         var fds = [proc_fdinfo](repeating: proc_fdinfo(), count: Int(listSize) / entrySize + 8)
         let bytes = Int32(fds.count * entrySize)
         let got = fds.withUnsafeMutableBytes { proc_pidinfo(pid, PROC_PIDLISTFDS, 0, $0.baseAddress, bytes) }
-        guard got > 0 else { return [] }
+        guard got > 0 else { return ([], 0) }
 
         var ports = Set<UInt16>()
+        var establishedLocalPorts: [UInt16] = []
         let socketSize = Int32(MemoryLayout<socket_fdinfo>.size)
         for fd in fds.prefix(Int(got) / entrySize) where fd.proc_fdtype == UInt32(PROX_FDTYPE_SOCKET) {
             var socket = socket_fdinfo()
             guard proc_pidfdinfo(pid, fd.proc_fd, PROC_PIDFDSOCKETINFO, &socket, socketSize) == socketSize,
-                  socket.psi.soi_kind == Int32(SOCKINFO_TCP),
-                  socket.psi.soi_proto.pri_tcp.tcpsi_state == Int32(TSI_S_LISTEN)
+                  socket.psi.soi_kind == Int32(SOCKINFO_TCP)
             else { continue }
+            let state = socket.psi.soi_proto.pri_tcp.tcpsi_state
+            guard state == Int32(TSI_S_LISTEN) || state == Int32(TSI_S_ESTABLISHED) else { continue }
             let networkOrder = UInt16(truncatingIfNeeded: socket.psi.soi_proto.pri_tcp.tcpsi_ini.insi_lport)
-            ports.insert(UInt16(bigEndian: networkOrder))
+            let port = UInt16(bigEndian: networkOrder)
+            if state == Int32(TSI_S_LISTEN) { ports.insert(port) } else { establishedLocalPorts.append(port) }
         }
-        return ports.sorted()
+        return (ports.sorted(), establishedLocalPorts.filter(ports.contains).count)
     }
 }
 

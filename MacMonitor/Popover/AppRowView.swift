@@ -6,6 +6,7 @@ struct AppRowView: View {
     let model: AppModel
     let group: AppGroup
     let dot: RowDot
+    let rowTag: RowTag?
 
     private var expanded: Bool { model.expandedID == group.id }
     private var groupKey: String { KillCoordinator.groupKey(group.id) }
@@ -16,13 +17,21 @@ struct AppRowView: View {
         if expanded {
             panel
         } else {
-            RowHeader(group: group, dot: dot, sort: model.sort, expanded: false, onToggle: toggle, onKill: killGroup)
+            RowHeader(group: group, dot: dot, tag: rowTag?.tag, sort: model.sort, expanded: false, onToggle: toggle, onKill: killGroup)
         }
     }
 
     private var panel: some View {
         VStack(spacing: 0) {
-            RowHeader(group: group, dot: dot, sort: model.sort, expanded: true, onToggle: toggle, onKill: killGroup)
+            RowHeader(group: group, dot: dot, tag: rowTag?.tag, sort: model.sort, expanded: true, onToggle: toggle, onKill: killGroup)
+            if let line = rowTag?.evidenceLine {
+                // 이름 시작 위치(왼쪽 48)에 맞춘다
+                Text(line)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(EdgeInsets(top: 0, leading: 48, bottom: 4, trailing: 8))
+            }
             ForEach(group.subgroups) { sub in
                 SubRowView(sort: model.sort, sub: sub, canKill: sub.isTerminable) {
                     model.kill.terminate(
@@ -57,6 +66,7 @@ struct AppRowView: View {
 private struct RowHeader: View {
     let group: AppGroup
     let dot: RowDot
+    let tag: UsageTag?
     let sort: AppSort
     let expanded: Bool
     let onToggle: () -> Void
@@ -87,11 +97,15 @@ private struct RowHeader: View {
         HStack(spacing: 10) {
             AppIcon(group: group)
             VStack(alignment: .leading, spacing: 0) {
-                Text(group.displayName)
-                    .font(.system(size: 13, weight: dot == .danger ? .semibold : .medium))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+                HStack(spacing: 6) {
+                    Text(group.displayName)
+                        .font(.system(size: 13, weight: dot == .danger ? .semibold : .medium))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                    // 긴 이름은 이름 쪽이 잘리고 배지는 유지
+                    if let tag { TagBadge(tag: tag).layoutPriority(1) }
+                }
                 Text(detail)
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
@@ -113,7 +127,7 @@ private struct RowHeader: View {
         .onTapGesture(perform: onToggle)
         .accessibilityElement(children: .contain)
         .accessibilityAddTraits(.isButton)
-        .accessibilityLabel("\(group.displayName), \(detail), \(value)")
+        .accessibilityLabel("\(group.displayName), \(tag.map { "\($0.rawValue), " } ?? "")\(detail), \(value)")
         .accessibilityHint(expanded ? "접기" : "하위 프로세스 펼치기")
         .accessibilityAction(named: expanded ? "접기" : "펼치기", onToggle)
     }
@@ -127,6 +141,24 @@ private struct RowHeader: View {
             KillXButton(size: 28, iconSize: 11, action: onKill)
                 .accessibilityLabel("\(group.displayName) 종료")
         }
+    }
+}
+
+/// 앱 이름 옆 태그 배지: 11 semibold 캡슐, 종료 추천 = 위험색, 관심 필요 = 주의색
+private struct TagBadge: View {
+    let tag: UsageTag
+
+    private var color: Color { tag == .terminate ? Theme.danger : Theme.warn }
+
+    var body: some View {
+        Text(tag.rawValue)
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(color)
+            .lineLimit(1)
+            .fixedSize()
+            .padding(.horizontal, 7)
+            .padding(.vertical, 1)
+            .background(color.opacity(Theme.badgeFillOpacity), in: Capsule())
     }
 }
 

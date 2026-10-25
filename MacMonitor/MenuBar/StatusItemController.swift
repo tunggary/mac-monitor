@@ -200,6 +200,7 @@ final class StatusItemController: NSObject {
         button.highlight(true)
         panel.makeKeyAndOrderFront(nil)
         installDismissMonitors()
+        model.popoverDidOpen()
     }
 
     /// 상태 아이템 아래 중앙, 화면 밖이면 안으로. 높이가 바뀌어도 위쪽을 고정한다.
@@ -244,6 +245,7 @@ final class StatusItemController: NSObject {
 
     private func closePopover() {
         guard let panel else { return }
+        model.popoverDidClose()
         monitors.forEach(NSEvent.removeMonitor)
         monitors = []
         if let resignObserver { NotificationCenter.default.removeObserver(resignObserver) }

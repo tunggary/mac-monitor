@@ -118,6 +118,8 @@ enum Grouping {
             add(sample, id: bundle, kind: .app, name: bundleName(bundle), bundle: bundle, cwd: nil)
         }
 
+        let dockerBundle = dockerBundle(in: samples)
+
         for sample in samples {
             if let own = outermostBundle(path: sample.path) {
                 addToApp(sample, bundle: own)
@@ -130,6 +132,8 @@ enum Grouping {
                     let folder = cwdFolder(sample.cwd)
                     add(sample, id: "cli:\(sample.name)|\(folder ?? "")", kind: .cli, name: sample.name, bundle: nil, cwd: folder)
                 }
+            } else if sample.name == virtualMachineName, let docker = dockerBundle {
+                addToApp(sample, bundle: docker)
             } else {
                 add(sample, id: "proc:\(sample.name)", kind: .process, name: sample.name, bundle: nil, cwd: nil)
             }
@@ -153,6 +157,13 @@ enum Grouping {
             )
         }
         .sorted { ($0.footprint, $1.displayName) > ($1.footprint, $0.displayName) }
+    }
+
+    static let virtualMachineName = "com.apple.Virtualization.VirtualMachine"
+
+    /// Docker VM(XPC, 부모 launchd)은 responsible pid 로 안 묶일 수 있어, com.docker.virtualization 이 떠 있을 때만 Docker.app 에 묶는다.
+    static func dockerBundle(in samples: [ProcessSample]) -> String? {
+        samples.first { $0.name == "com.docker.virtualization" }.flatMap { outermostBundle(path: $0.path) }
     }
 
     /// 자체 번들이 없는 프로세스의 소속 번들: responsible pid 의 번들 → 없으면 부모 체인에서 처음 만나는 번들.

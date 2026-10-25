@@ -14,6 +14,9 @@ struct Settings: Sendable, Equatable {
     var spikeSeconds = 30.0
     /// 위험 지속 시 재알림 간격(분). 0 = 다시 안 함.
     var repeatIntervalMinutes = 10
+    /// AI 판정 스위치 (기본 끔)
+    var aiVerdictEnabled = false
+    var aiVerdictEngineID = "jev"
 
     var swapCautionBytes: Double { swapCautionGB * Self.bytesPerGB }
     var swapDangerBytes: Double { swapDangerGB * Self.bytesPerGB }
@@ -25,6 +28,8 @@ struct Settings: Sendable, Equatable {
         static let appCPUCaution = "settings.appCPUCautionPercent"
         static let spikeSeconds = "settings.spikeSeconds"
         static let repeatInterval = "settings.repeatIntervalMinutes"
+        static let aiVerdictEnabled = "settings.aiVerdictEnabled"
+        static let aiVerdictEngineID = "settings.aiVerdictEngineID"
     }
 
     static func load(from defaults: UserDefaults = .standard) -> Settings {
@@ -36,6 +41,8 @@ struct Settings: Sendable, Equatable {
         settings.appCPUCautionPercent = double(Key.appCPUCaution) ?? settings.appCPUCautionPercent
         settings.spikeSeconds = double(Key.spikeSeconds) ?? settings.spikeSeconds
         settings.repeatIntervalMinutes = (defaults.object(forKey: Key.repeatInterval) as? Int) ?? settings.repeatIntervalMinutes
+        settings.aiVerdictEnabled = (defaults.object(forKey: Key.aiVerdictEnabled) as? Bool) ?? settings.aiVerdictEnabled
+        settings.aiVerdictEngineID = defaults.string(forKey: Key.aiVerdictEngineID) ?? settings.aiVerdictEngineID
         return settings
     }
 
@@ -46,5 +53,7 @@ struct Settings: Sendable, Equatable {
         defaults.set(appCPUCautionPercent, forKey: Key.appCPUCaution)
         defaults.set(spikeSeconds, forKey: Key.spikeSeconds)
         defaults.set(repeatIntervalMinutes, forKey: Key.repeatInterval)
+        defaults.set(aiVerdictEnabled, forKey: Key.aiVerdictEnabled)
+        defaults.set(aiVerdictEngineID, forKey: Key.aiVerdictEngineID)
     }
 }
