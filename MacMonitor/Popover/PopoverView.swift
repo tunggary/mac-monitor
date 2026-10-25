@@ -26,6 +26,9 @@ struct PopoverView: View {
         .glassEffect(Theme.popoverGlass, in: .rect(cornerRadius: Theme.popoverRadius, style: .continuous))
         .background(Theme.popoverDim, in: .rect(cornerRadius: Theme.popoverRadius, style: .continuous))
         .preferredColorScheme(.dark)
+        // 포커스를 뺏지 않는 패널이라 앱이 늘 비활성이고, 비활성 창의 유리는 굴절·테두리 반사광 없이 탁하게 그려진다.
+        // 제어 센터처럼 맑은 유리로 보이도록 활성 상태로 고정한다.
+        .environment(\.controlActiveState, .key)
     }
 }
 
