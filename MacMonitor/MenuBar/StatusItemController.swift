@@ -115,6 +115,7 @@ final class StatusItemController: NSObject {
     private var hosting: SizeReportingHostingController<PopoverView>?
     private var monitors: [Any] = []
     private var resignObserver: NSObjectProtocol?
+    private var spaceObserver: NSObjectProtocol?
     private var shownLevel: MemoryLevel = .normal
     private let frameView = FrameView(frame: .zero)
 
@@ -210,7 +211,8 @@ final class StatusItemController: NSObject {
         // 창 그림자는 사각 윤곽으로 그려져 둥근 유리 모서리 밖에 검은 모서리가 비친다. 그림자는 유리 자체에 맡긴다.
         panel.hasShadow = false
         panel.level = .popUpMenu
-        panel.collectionBehavior = [.canJoinAllSpaces, .transient, .ignoresCycle]
+        // 연 Space 에만 둔다 — 전환 시 다음 화면으로 따라오지 않고 이전 화면과 함께 밀려난다. 전체 화면 앱 위에서도 열리게 fullScreenAuxiliary.
+        panel.collectionBehavior = [.fullScreenAuxiliary, .transient, .ignoresCycle]
         panel.isReleasedWhenClosed = false
         panel.appearance = NSAppearance(named: .darkAqua)
         panel.onCancel = { [weak self] in self?.closePopover() }
@@ -263,6 +265,12 @@ final class StatusItemController: NSObject {
         ) { [weak self] _ in
             Task { @MainActor in self?.closePopover() }
         }
+        // 화면(Space)이 바뀌면 포커스 없이 남아 있지 않게 닫는다.
+        spaceObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.closePopover() }
+        }
     }
 
     private func closePopover() {
@@ -272,6 +280,8 @@ final class StatusItemController: NSObject {
         monitors = []
         if let resignObserver { NotificationCenter.default.removeObserver(resignObserver) }
         resignObserver = nil
+        if let spaceObserver { NSWorkspace.shared.notificationCenter.removeObserver(spaceObserver) }
+        spaceObserver = nil
         statusItem.button?.highlight(false)
         panel.orderOut(nil)
         panel.contentView = nil
