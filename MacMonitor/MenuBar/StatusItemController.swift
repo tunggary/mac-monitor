@@ -3,48 +3,83 @@ import os
 import SwiftUI
 
 /// 앵무새 프레임 애니메이션을 Core Animation 렌더 서버에 맡기는 뷰.
-/// CAKeyframeAnimation(contents, discrete)을 걸어 두면 프레임마다 앱이 깨어나지 않는다.
+/// 프레임을 가로로 이어 붙인 템플릿 이미지 한 장을 NSImageView 에 두고, 그 레이어의 x 위치를
+/// 한 칸씩 discrete 키프레임으로 옮긴다. 프레임마다 앱이 깨어나지 않고, 템플릿이라 시스템 아이콘처럼
+/// 메뉴바 색을 따르며 포커스 없는 모니터의 메뉴바에서는 함께 흐려진다.
+/// (layer.contents 를 직접 바꾸면 템플릿 처리를 못 받는다 — 비활성 화면에서 혼자 흰색으로 남는다.)
 private final class FrameView: NSView {
     /// 현재 애니메이션의 한 바퀴 길이(초)와 레이어 시간 기준 시작점. 교체 시 위상을 이어받는 데 쓴다.
     private(set) var duration: CFTimeInterval?
     private var origin: CFTimeInterval = 0
+    /// 한 칸 너비로 잘라 보여 주는 창
+    private let clip = NSView()
+    private let strip = NSImageView()
+    private var frameSize = NSSize.zero
+    private var frameCount = 0
 
     override init(frame: NSRect) {
         super.init(frame: frame)
         wantsLayer = true
         translatesAutoresizingMaskIntoConstraints = false
-        // 아래쪽에 붙이고, 하단 여백은 버튼 제약(bottomPadding)으로 준다.
-        layer?.contentsGravity = .bottom
+        clip.wantsLayer = true
+        clip.layer?.masksToBounds = true
+        strip.imageScaling = .scaleNone
+        strip.wantsLayer = true
+        clip.addSubview(strip)
+        addSubview(clip)
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
-    /// frames 를 duration 초에 한 바퀴 돌게 건다. 이미 돌고 있었다면 현재 위상(0..<1)에서 이어서 돈다.
-    func play(_ frames: [CGImage], duration: CFTimeInterval, scale: CGFloat) {
-        guard let layer, let first = frames.first else { return }
+    /// 한 칸 창을 가로 가운데·바닥에 둔다. 띠의 나머지 칸은 창 밖으로 잘려 나간다.
+    override func layout() {
+        super.layout()
+        clip.frame = NSRect(origin: NSPoint(x: ((bounds.width - frameSize.width) / 2).rounded(), y: 0), size: frameSize)
+        strip.frame = NSRect(x: 0, y: 0, width: frameSize.width * CGFloat(frameCount), height: frameSize.height)
+    }
+
+    /// 같은 크기의 프레임들을 가로로 이어 붙인 템플릿 이미지로 바꿔 건다.
+    func setFrames(_ frames: [NSImage]) {
+        guard let first = frames.first else { return }
+        frameSize = first.size
+        frameCount = frames.count
+        let image = NSImage(size: NSSize(width: frameSize.width * CGFloat(frames.count), height: frameSize.height), flipped: false) { _ in
+            for (index, frame) in frames.enumerated() {
+                frame.draw(in: NSRect(origin: NSPoint(x: self.frameSize.width * CGFloat(index), y: 0), size: self.frameSize))
+            }
+            return true
+        }
+        image.isTemplate = true
+        strip.image = image
+        needsLayout = true
+        duration = nil
+    }
+
+    var isPlaying: Bool { strip.layer?.animation(forKey: "frames") != nil }
+
+    /// duration 초에 한 바퀴 돌게 건다. 이미 돌고 있었다면 현재 위상(0..<1)에서 이어서 돈다.
+    func play(duration: CFTimeInterval) {
+        layoutSubtreeIfNeeded()
+        guard let layer = strip.layer, frameCount > 0 else { return }
         let now = layer.convertTime(CACurrentMediaTime(), from: nil)
         var phase = 0.0
         if let current = self.duration {
             phase = ((now - origin) / current).truncatingRemainder(dividingBy: 1)
         }
 
-        let animation = CAKeyframeAnimation(keyPath: "contents")
-        animation.values = frames
-        animation.keyTimes = (0...frames.count).map { NSNumber(value: Double($0) / Double(frames.count)) }
+        // AppKit 이 정한 위치는 그대로 두고 그 위에 -칸 너비만큼 더한다.
+        let animation = CAKeyframeAnimation(keyPath: "position.x")
+        animation.values = (0..<frameCount).map { -frameSize.width * CGFloat($0) }
+        animation.isAdditive = true
+        animation.keyTimes = (0...frameCount).map { NSNumber(value: Double($0) / Double(frameCount)) }
         animation.calculationMode = .discrete
         animation.duration = duration
         animation.repeatCount = .infinity
         animation.isRemovedOnCompletion = false
         animation.beginTime = now - phase * duration
-
-        CATransaction.begin()
-        CATransaction.setDisableActions(true)
-        layer.contentsScale = scale
-        layer.contents = first
         layer.add(animation, forKey: "frames")
-        CATransaction.commit()
 
         self.duration = duration
         origin = animation.beginTime
@@ -82,8 +117,6 @@ final class StatusItemController: NSObject {
     private var resignObserver: NSObjectProtocol?
     private var shownLevel: MemoryLevel = .normal
     private let frameView = FrameView(frame: .zero)
-    /// 상태별 CGImage 캐시 (NSImage → CGImage 변환은 시작 후 한 번만)
-    private var cgFrames: [MemoryLevel: [CGImage]] = [:]
 
     init(model: AppModel, character: any Character, openSettings: @escaping () -> Void) {
         self.model = model
@@ -108,7 +141,7 @@ final class StatusItemController: NSObject {
         model.onUpdate = { [weak self] in self?.modelDidUpdate() }
     }
 
-    // MARK: 프레임 애니메이션 — 렌더 서버가 돌리고, 속도·색이 의미 있게 바뀔 때만 애니메이션을 교체한다.
+    // MARK: 프레임 애니메이션 —렌더 서버가 돌리고, 속도·색이 의미 있게 바뀔 때만 애니메이션을 교체한다.
 
     /// 한 바퀴 길이가 이 비율 이상 바뀌어야 애니메이션을 교체한다 (1초마다 갈아끼우는 비용을 피한다).
     private static let durationChangeThreshold = 0.05
@@ -116,26 +149,15 @@ final class StatusItemController: NSObject {
     private func targetDuration() -> CFTimeInterval {
         let cpu = model.latest?.cpuBusy ?? 0
         let fps = CharacterSpeed.framesPerSecond(cpuPercent: cpu, range: character.framesPerSecondRange)
-        return Double(framesFor(shownLevel).count) / fps
-    }
-
-    private func framesFor(_ level: MemoryLevel) -> [CGImage] {
-        if cgFrames[level] == nil {
-            // 비트맵 rep 의 원본 픽셀(@2x)을 그대로 쓴다. cgImage(forProposedRect:) 는 pt 크기로 줄여 돌려준다.
-            cgFrames[level] = character.frames(for: level).compactMap {
-                ($0.representations.first as? NSBitmapImageRep)?.cgImage
-            }
-        }
-        return cgFrames[level] ?? []
+        return Double(character.frames(for: shownLevel).count) / fps
     }
 
     private func updateAnimation(levelChanged: Bool = true) {
-        let frames = framesFor(shownLevel)
-        guard !frames.isEmpty else { return }
+        if levelChanged { frameView.setFrames(character.frames(for: shownLevel)) }
         let duration = targetDuration()
-        if !levelChanged, let current = frameView.duration,
+        if !levelChanged, frameView.isPlaying, let current = frameView.duration,
            abs(duration - current) / current < Self.durationChangeThreshold { return }
-        frameView.play(frames, duration: duration, scale: statusItem.button?.window?.backingScaleFactor ?? 2)
+        frameView.play(duration: duration)
         Self.log.debug("animation duration \(duration, format: .fixed(precision: 3))s level \(String(describing: self.shownLevel), privacy: .public)")
     }
 

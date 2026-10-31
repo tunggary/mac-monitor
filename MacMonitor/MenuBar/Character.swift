@@ -100,7 +100,7 @@ final class PartyParrot: Character {
         return CGRect(x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1)
     }
 
-    /// 잘라낸 영역을 높이 기준으로 레티나(@2x) 비트맵에 그려 둔다. 템플릿 아님(색이 핵심).
+    /// 잘라낸 영역을 높이 기준으로 레티나(@2x) 비트맵에 그려 둔다. 템플릿 이미지라 색은 메뉴바가 정한다.
     private static func render(_ source: CGImage, crop: CGRect, height points: CGFloat) -> NSImage? {
         guard let cropped = source.cropping(to: crop) else { return nil }
         let size = NSSize(width: (points * crop.width / crop.height).rounded(), height: points)
@@ -116,7 +116,7 @@ final class PartyParrot: Character {
         NSGraphicsContext.restoreGraphicsState()
         let image = NSImage(size: size)
         image.addRepresentation(rep)
-        image.isTemplate = false
+        image.isTemplate = true
         return image
     }
 }
