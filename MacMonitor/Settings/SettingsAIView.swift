@@ -6,12 +6,6 @@ struct AIVerdictSection: View {
     @Bindable var model: AppModel
     var openAuditLog: () -> Void = {}
 
-    private enum Check { case none, checking, connected, invalid, saveFailed }
-
-    @State private var keyText = ""
-    @State private var hasKey = false
-    @State private var check = Check.none
-
     private var engineID: String { model.settings.aiVerdictEngineID }
 
     var body: some View {
@@ -36,12 +30,8 @@ struct AIVerdictSection: View {
                     Rectangle().fill(Theme.divider).frame(height: 1)
                     engineRow
                     Rectangle().fill(Theme.divider).frame(height: 1)
-                    keyRow
-                    if !hasKey || check == .invalid {
-                        Text("키를 넣어야 동작해요")
-                            .font(.system(size: 11))
-                            .foregroundStyle(Theme.warn)
-                            .padding(.bottom, 10)
+                    APIKeyRows(keyStore: model.keyStore, providerID: engineID) { key in
+                        await VerdictEngines.engine(id: engineID)?.validate(apiKey: key) ?? false
                     }
                 }
                 // 기록은 꺼져 있어도 지난 호출을 볼 수 있게 항상 보인다
@@ -49,12 +39,6 @@ struct AIVerdictSection: View {
                 auditLogRow
             }
             .settingsCard()
-        }
-        .onAppear { refreshHasKey() }
-        .onChange(of: engineID) { _, _ in
-            keyText = ""
-            check = .none
-            refreshHasKey()
         }
     }
 
@@ -95,6 +79,37 @@ struct AIVerdictSection: View {
             .fixedSize()
         }
         .frame(minHeight: 44)
+    }
+}
+
+/// API 키 입력 줄: 저장·삭제·연결 확인. 제공자(`providerID`)가 바뀌면 입력을 비운다.
+struct APIKeyRows: View {
+    let keyStore: any APIKeyStore
+    let providerID: String
+    let validate: (String) async -> Bool
+
+    private enum Check { case none, checking, connected, invalid, saveFailed }
+
+    @State private var keyText = ""
+    @State private var hasKey = false
+    @State private var check = Check.none
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            keyRow
+            if !hasKey || check == .invalid {
+                Text("키를 넣어야 동작해요")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Theme.warn)
+                    .padding(.bottom, 10)
+            }
+        }
+        .onAppear { refreshHasKey() }
+        .onChange(of: providerID) { _, _ in
+            keyText = ""
+            check = .none
+            refreshHasKey()
+        }
     }
 
     private var keyRow: some View {
@@ -145,15 +160,15 @@ struct AIVerdictSection: View {
     }
 
     private func refreshHasKey() {
-        hasKey = !(model.keyStore.key(for: engineID) ?? "").isEmpty
+        hasKey = !(keyStore.key(for: providerID) ?? "").isEmpty
     }
 
     private func saveKey() {
         let key = keyText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !key.isEmpty, check != .checking else { return }
-        let id = engineID
+        let id = providerID
         do {
-            try model.keyStore.save(key, for: id)
+            try keyStore.save(key, for: id)
         } catch {
             check = .saveFailed
             return
@@ -161,19 +176,75 @@ struct AIVerdictSection: View {
         keyText = ""
         hasKey = true
         check = .checking
-        guard let engine = VerdictEngines.engine(id: id) else { return }
         Task {
-            let ok = await engine.validate(apiKey: key)
-            guard id == engineID else { return }
+            let ok = await validate(key)
+            guard id == providerID else { return }
             check = ok ? .connected : .invalid
         }
     }
 
     private func deleteKey() {
-        try? model.keyStore.delete(for: engineID)
+        try? keyStore.delete(for: providerID)
         keyText = ""
         check = .none
         refreshHasKey()
+    }
+}
+
+/// "AI 설명" 섹션: 스위치(AI 판정이 켜져 있어야 켤 수 있다) + (켜면) 제공자 선택·API 키
+struct AIExplainSection: View {
+    @Bindable var model: AppModel
+
+    private var providerID: String { model.settings.aiExplainProviderID }
+
+    var body: some View {
+        SettingsSection(title: "AI 설명") {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text("AI 설명")
+                            .font(.system(size: 13))
+                            .foregroundStyle(.primary)
+                        Text(model.settings.aiVerdictEnabled
+                            ? "배지가 붙은 앱을 LLM 이 조사해 설명하고, 정상이면 배지를 떼요"
+                            : "AI 판정을 켜야 쓸 수 있어요")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Toggle("AI 설명", isOn: $model.settings.aiExplainEnabled)
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                        .disabled(!model.settings.aiVerdictEnabled)
+                }
+                .frame(minHeight: 44)
+                if model.settings.aiExplainActive {
+                    Rectangle().fill(Theme.divider).frame(height: 1)
+                    providerRow
+                    Rectangle().fill(Theme.divider).frame(height: 1)
+                    APIKeyRows(keyStore: model.keyStore, providerID: providerID) { key in
+                        await ExplainProviders.provider(id: providerID)?.validate(apiKey: key) ?? false
+                    }
+                }
+            }
+            .settingsCard()
+        }
+    }
+
+    private var providerRow: some View {
+        HStack {
+            Text("설명 제공자")
+                .font(.system(size: 13))
+                .foregroundStyle(.primary)
+            Spacer()
+            Picker("설명 제공자", selection: $model.settings.aiExplainProviderID) {
+                ForEach(ExplainProviders.all, id: \.id) { Text($0.displayName).tag($0.id) }
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .fixedSize()
+        }
+        .frame(minHeight: 44)
     }
 }
 
@@ -279,7 +350,7 @@ struct AuditLogSection: View {
                 Button(action: onToggle) {
                     HStack(alignment: .top, spacing: 8) {
                         VStack(alignment: .leading, spacing: 0) {
-                            Text("\(entry.time.formatted(AuditLogSection.timeFormat)) · \(entry.engineID) · \(entry.groupName)")
+                            Text("\(entry.time.formatted(AuditLogSection.timeFormat)) · \(AuditFormat.engineLabel(entry)) · \(entry.groupName)")
                                 .font(.system(size: 12))
                                 .foregroundStyle(.primary)
                                 .lineLimit(1)
@@ -307,6 +378,9 @@ struct AuditLogSection: View {
                 if open {
                     if let error = entry.error {
                         Text(error).font(.system(size: 11)).foregroundStyle(Theme.danger).textSelection(.enabled)
+                    }
+                    if let commands = entry.commands, !commands.isEmpty {
+                        BodyBox(title: "실행한 명령", text: commands.joined(separator: "\n"))
                     }
                     BodyBox(title: "요청", text: AuditFormat.pretty(entry.requestBody))
                     BodyBox(title: "응답", text: AuditFormat.pretty(entry.responseBody))
