@@ -28,6 +28,9 @@ final class AppModel {
     /// AI 판정 결과 (그룹 id → 판정). 팝오버를 열 때·정렬을 바꿀 때 갱신한다.
     private(set) var aiVerdicts: [String: AIVerdict] = [:]
     private(set) var verdictPending = false
+    /// AI 설명 결과 (그룹 id → 설명)와 진행 중인 그룹
+    private(set) var explanations: [String: AIExplanation] = [:]
+    private(set) var explainPending: Set<String> = []
     private(set) var memoryLevel: MemoryLevel = .normal
     private(set) var dangerSince: Date?
     /// 시계열은 링버퍼에 있어 관찰 대상이 아니다. 뷰는 이 값을 읽어 갱신을 받는다.
@@ -41,6 +44,11 @@ final class AppModel {
         didSet {
             guard settings != oldValue else { return }
             settings.save()
+            if popoverOpen,
+               settings.aiExplainActive != oldValue.aiExplainActive
+                || (settings.aiExplainActive && settings.aiExplainProviderID != oldValue.aiExplainProviderID) {
+                requestExplanations()
+            }
             if let latest { updateMemoryLevel(snapshot: latest) }
             onUpdate?()
         }
@@ -52,6 +60,7 @@ final class AppModel {
     let keyStore: any APIKeyStore = KeychainKeyStore()
     let auditLog = VerdictAuditLog()
     let verdictService: VerdictService
+    let explainService: ExplainService
 
     @ObservationIgnored private var cpuBuffer = RingBuffer<Double>()
     @ObservationIgnored private var memoryBuffer = RingBuffer<Double>()
@@ -69,9 +78,12 @@ final class AppModel {
     @ObservationIgnored private var alertEngine = AlertEngine()
     @ObservationIgnored private var popoverOpen = false
     @ObservationIgnored private var verdictTask: Task<Void, Never>?
+    /// 설명 요청 세대. 설정이 바뀌어 새로 요청하면 이전 요청의 결과는 버린다.
+    @ObservationIgnored private var explainGeneration = 0
 
     init() {
         verdictService = VerdictService(keyStore: keyStore, audit: auditLog)
+        explainService = ExplainService(keyStore: keyStore, audit: auditLog)
     }
 
     var dangerCause: DangerCause? {
@@ -95,7 +107,11 @@ final class AppModel {
 
     /// 행별 최종 표시값 (규칙 + AI 판정). 태그·근거가 없는 행은 빠진다.
     var rowTags: [String: RowTag] {
-        RowTags.compute(outcomes: ruleOutcomes, verdicts: aiVerdicts, aiEnabled: settings.aiVerdictEnabled, pending: verdictPending)
+        let active = settings.aiExplainActive
+        return RowTags.compute(
+            outcomes: ruleOutcomes, verdicts: aiVerdicts, aiEnabled: settings.aiVerdictEnabled, pending: verdictPending,
+            explanations: active ? explanations : [:], explainPending: active ? explainPending : []
+        )
     }
 
     /// 상위 앱 5개 (정렬 기준에 따라)
@@ -169,12 +185,14 @@ final class AppModel {
             verdictTask = nil
             verdictPending = false
             aiVerdicts = [:]
+            requestExplanations()
             return
         }
         let items = RowTags.verdictTargets(signals: usageSignals, outcomes: ruleOutcomes)
         guard !items.isEmpty else {
             verdictTask = nil
             verdictPending = false
+            requestExplanations()
             return
         }
         let engineID = settings.aiVerdictEngineID
@@ -184,6 +202,54 @@ final class AppModel {
             guard !Task.isCancelled else { return }
             aiVerdicts = result
             verdictPending = false
+            requestExplanations()
+        }
+    }
+
+    /// 배지가 붙은 행(설명 없이 계산한 원래 태그 기준)을 LLM 이 조사해 설명한다. 팝오버가 닫혀도 취소하지 않는다
+    /// (서비스 캐시에 남겨 다음에 바로 보이게). 결과는 세대가 같을 때만 반영한다.
+    private func requestExplanations() {
+        explainGeneration += 1
+        let generation = explainGeneration
+        guard settings.aiExplainActive else {
+            explanations = [:]
+            explainPending = []
+            return
+        }
+        let base = RowTags.compute(outcomes: ruleOutcomes, verdicts: aiVerdicts, aiEnabled: settings.aiVerdictEnabled, pending: false)
+        let requests: [ExplainRequest] = RowTags.explainTargets(baseTags: base).compactMap { id, tag in
+            guard let signals = usageSignals[id] else { return nil }
+            let group = groups.first { $0.id == id }
+            return ExplainRequest(
+                groupID: id, groupName: group?.displayName ?? signals.displayName, tag: tag, executablePath: signals.executablePath,
+                context: ExplainPrompt.context(signals: signals, group: group, rule: ruleOutcomes[id] ?? .none, verdict: aiVerdicts[id], tag: tag)
+            )
+        }
+        let ids = Set(requests.map(\.groupID))
+        explanations = explanations.filter { ids.contains($0.key) }
+        explainPending = []
+        guard !requests.isEmpty else { return }
+        let providerID = settings.aiExplainProviderID
+        Task { [explainService] in
+            var missing: [ExplainRequest] = []
+            for request in requests {
+                if let hit = await explainService.cached(for: request, providerID: providerID) {
+                    guard generation == explainGeneration else { return }
+                    explanations[request.groupID] = hit
+                } else {
+                    missing.append(request)
+                }
+            }
+            guard generation == explainGeneration else { return }
+            explainPending = Set(missing.map(\.groupID))
+            for request in missing {
+                Task {
+                    let result = await explainService.explanation(for: request, providerID: providerID)
+                    guard generation == explainGeneration else { return }
+                    if let result { explanations[request.groupID] = result }
+                    explainPending.remove(request.groupID)
+                }
+            }
         }
     }
 

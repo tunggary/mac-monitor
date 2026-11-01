@@ -17,6 +17,11 @@ struct Settings: Sendable, Equatable {
     /// AI 판정 스위치 (기본 끔)
     var aiVerdictEnabled = false
     var aiVerdictEngineID = "jev"
+    /// AI 설명 스위치 (기본 끔). AI 판정이 꺼져 있으면 값은 남기되 동작하지 않는다.
+    var aiExplainEnabled = false
+    var aiExplainProviderID = "claude"
+
+    var aiExplainActive: Bool { aiVerdictEnabled && aiExplainEnabled }
 
     var swapCautionBytes: Double { swapCautionGB * Self.bytesPerGB }
     var swapDangerBytes: Double { swapDangerGB * Self.bytesPerGB }
@@ -30,6 +35,8 @@ struct Settings: Sendable, Equatable {
         static let repeatInterval = "settings.repeatIntervalMinutes"
         static let aiVerdictEnabled = "settings.aiVerdictEnabled"
         static let aiVerdictEngineID = "settings.aiVerdictEngineID"
+        static let aiExplainEnabled = "settings.aiExplainEnabled"
+        static let aiExplainProviderID = "settings.aiExplainProviderID"
     }
 
     static func load(from defaults: UserDefaults = .standard) -> Settings {
@@ -43,6 +50,8 @@ struct Settings: Sendable, Equatable {
         settings.repeatIntervalMinutes = (defaults.object(forKey: Key.repeatInterval) as? Int) ?? settings.repeatIntervalMinutes
         settings.aiVerdictEnabled = (defaults.object(forKey: Key.aiVerdictEnabled) as? Bool) ?? settings.aiVerdictEnabled
         settings.aiVerdictEngineID = defaults.string(forKey: Key.aiVerdictEngineID) ?? settings.aiVerdictEngineID
+        settings.aiExplainEnabled = (defaults.object(forKey: Key.aiExplainEnabled) as? Bool) ?? settings.aiExplainEnabled
+        settings.aiExplainProviderID = defaults.string(forKey: Key.aiExplainProviderID) ?? settings.aiExplainProviderID
         return settings
     }
 
@@ -55,5 +64,7 @@ struct Settings: Sendable, Equatable {
         defaults.set(repeatIntervalMinutes, forKey: Key.repeatInterval)
         defaults.set(aiVerdictEnabled, forKey: Key.aiVerdictEnabled)
         defaults.set(aiVerdictEngineID, forKey: Key.aiVerdictEngineID)
+        defaults.set(aiExplainEnabled, forKey: Key.aiExplainEnabled)
+        defaults.set(aiExplainProviderID, forKey: Key.aiExplainProviderID)
     }
 }

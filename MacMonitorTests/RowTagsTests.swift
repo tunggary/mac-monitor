@@ -45,6 +45,63 @@ struct RowTagsTests {
     }
 }
 
+struct RowTagsExplainTests {
+    private func explanation(_ verdict: VerdictChoice?, input: UsageTag = .terminate, failed: Bool = false) -> AIExplanation {
+        AIExplanation(
+            status: failed ? .failed("실패") : .ok, verdict: verdict, identity: "정체", reason: "이유", details: ["d"],
+            providerName: "Claude", inputTag: input
+        )
+    }
+
+    private let outcomes: [String: RuleOutcome] = ["a": .tag(.terminate, reason: "r")]
+
+    @Test func normalExplanationRemovesBadgeButKeepsRow() {
+        let r = RowTags.compute(outcomes: outcomes, verdicts: [:], aiEnabled: true, pending: false, explanations: ["a": explanation(.normal)])
+        #expect(r["a"]?.tag == nil)
+        #expect(r["a"]?.explanation == explanation(.normal))
+    }
+
+    @Test func attentionExplanationKeepsBadge() {
+        let r = RowTags.compute(outcomes: outcomes, verdicts: [:], aiEnabled: true, pending: false, explanations: ["a": explanation(.attention)])
+        #expect(r["a"]?.tag == .terminate)
+        #expect(r["a"]?.explanation?.verdict == .attention)
+    }
+
+    @Test func failedExplanationKeepsBadge() {
+        let r = RowTags.compute(outcomes: outcomes, verdicts: [:], aiEnabled: true, pending: false, explanations: ["a": explanation(nil, failed: true)])
+        #expect(r["a"]?.tag == .terminate)
+        #expect(r["a"]?.explanation != nil)
+    }
+
+    @Test func staleExplanationIsIgnored() {
+        let r = RowTags.compute(outcomes: outcomes, verdicts: [:], aiEnabled: true, pending: false, explanations: ["a": explanation(.normal, input: .attention)])
+        #expect(r["a"]?.tag == .terminate)
+        #expect(r["a"]?.explanation == nil)
+    }
+
+    @Test func pendingOnlyForTaggedRowsWithoutExplanation() {
+        let two: [String: RuleOutcome] = ["a": .tag(.terminate, reason: "r"), "b": .tag(.attention, reason: "r"), "c": .ambiguous(reason: "r")]
+        let r = RowTags.compute(
+            outcomes: two, verdicts: [:], aiEnabled: true, pending: false,
+            explanations: ["b": explanation(.attention, input: .attention)], explainPending: ["a", "b", "c"]
+        )
+        #expect(r["a"]?.explainPending == true)
+        #expect(r["b"]?.explainPending == false)
+        #expect(r["c"]?.explainPending == false)
+    }
+
+    @Test func explainTargetsUseOriginalTagNotBadgeRemoved() {
+        let two: [String: RuleOutcome] = ["a": .tag(.terminate, reason: "r"), "b": .tag(.attention, reason: "r"), "c": .none]
+        let base = RowTags.compute(outcomes: two, verdicts: [:], aiEnabled: true, pending: false)
+        let targets = RowTags.explainTargets(baseTags: base)
+        #expect(targets.map(\.id) == ["a", "b"])
+        #expect(targets.map(\.tag) == [.terminate, .attention])
+        // 설명을 합친 값에서는 a 의 배지가 사라지므로 대상 선정에 쓰면 안 된다
+        let withExplanation = RowTags.compute(outcomes: two, verdicts: [:], aiEnabled: true, pending: false, explanations: ["a": explanation(.normal)])
+        #expect(RowTags.explainTargets(baseTags: withExplanation).map(\.id) == ["b"])
+    }
+}
+
 struct AuditFormatTests {
     @Test func costFormat() {
         #expect(AuditFormat.cost(0) == "$0.00")
