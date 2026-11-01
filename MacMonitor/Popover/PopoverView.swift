@@ -254,6 +254,8 @@ private struct TopAppsSection: View {
     /// 접힌 행의 실제 높이(첫 측정 전 기본값). 목록 높이 = 접힌 행 5개.
     @State private var rowHeight: CGFloat = 46
     @State private var scroll = ScrollMetrics()
+    /// 목록 윗변의 창 안 y 좌표 — 화면 아래까지 남은 공간을 잴 때 쓴다
+    @State private var listTop: CGFloat = 0
 
     var body: some View {
         let _ = model.tick
@@ -284,7 +286,8 @@ private struct TopAppsSection: View {
                         }
                     }
                 }
-                .frame(height: rowHeight * 5 + Self.rowSpacing * 4)
+                .frame(height: listHeight)
+                .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minY } action: { listTop = $0 }
                 // 시스템 스크롤 막대는 폭을 차지해 행이 왼쪽으로 밀리므로 숨기고, 얇은 막대를 위에 겹쳐 그린다.
                 .scrollIndicators(.never)
                 .onScrollGeometryChange(for: ScrollMetrics.self) { geometry in
@@ -306,6 +309,18 @@ private struct TopAppsSection: View {
     }
 
     private static let rowSpacing: CGFloat = 4
+    /// 목록 아래(모듈 여백 + 푸터 + 패널 여백)와 화면 아래 여유
+    private static let belowList: CGFloat = 76
+
+    private var collapsedHeight: CGFloat { rowHeight * 5 + Self.rowSpacing * 4 }
+
+    /// 접힌 상태는 5행 고정. 펼치면 내용만큼 늘리되 화면 아래 끝을 넘지 않게 하고, 넘치는 부분은 스크롤.
+    private var listHeight: CGFloat {
+        guard model.expandedID != nil, scroll.content > collapsedHeight else { return collapsedHeight }
+        let screen = (NSApp.keyWindow?.screen ?? NSScreen.main)?.visibleFrame.height ?? 800
+        let available = screen - listTop - Self.belowList
+        return max(collapsedHeight, min(scroll.content, available))
+    }
 }
 
 private struct ScrollMetrics: Equatable {
