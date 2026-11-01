@@ -32,6 +32,9 @@ struct AppRowView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(EdgeInsets(top: 0, leading: 48, bottom: 4, trailing: 8))
             }
+            if let rowTag, rowTag.explainPending || rowTag.explanation != nil {
+                ExplainBlock(rowTag: rowTag)
+            }
             ForEach(group.subgroups) { sub in
                 SubRowView(sort: model.sort, sub: sub, canKill: sub.isTerminable) {
                     model.kill.terminate(
@@ -59,6 +62,169 @@ struct AppRowView: View {
 
     private func killGroup() {
         model.kill.terminate(key: groupKey, groupID: group.id, name: group.displayName, pids: group.terminablePids)
+    }
+}
+
+/// 펼친 영역의 AI 설명. 유리 위에서 흐려지지 않게 어두운 인셋 카드로 떼어 낸다.
+/// 위: 제공자 + 결론 알약, 가운데: 정체(primary) · 이유, 아래: 근거 칩 · 배지 해제 안내.
+private struct ExplainBlock: View {
+    let rowTag: RowTag
+
+    var body: some View {
+        Group {
+            if let explanation = rowTag.explanation {
+                switch explanation.status {
+                case .failed(let message):
+                    statusLine { Circle().fill(.tertiary).frame(width: 6, height: 6) } text: { "AI 설명을 못 받았어요 · \(message)" }
+                case .ok:
+                    content(explanation)
+                }
+            } else if rowTag.explainPending {
+                statusLine { ProgressView().controlSize(.mini) } text: { "AI가 프로세스를 살펴보는 중…" }
+            }
+        }
+        .padding(EdgeInsets(top: 0, leading: 46, bottom: 6, trailing: 10))
+        .accessibilityElement(children: .combine)
+    }
+
+    private func content(_ e: AIExplanation) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 6) {
+                Text("AI 설명 · \(e.providerName)")
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(.tertiary)
+                Spacer(minLength: 4)
+                if let verdict = e.verdict { VerdictPill(verdict: verdict) }
+            }
+            .padding(.bottom, 6)
+            if !e.identity.isEmpty {
+                Text(e.identity)
+                    .font(.system(size: 12.5, weight: .medium))
+                    .foregroundStyle(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if !e.reason.isEmpty {
+                Text(e.reason)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .lineSpacing(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 4)
+            }
+            if !e.details.isEmpty {
+                ChipFlow(spacing: 4) {
+                    ForEach(Array(e.details.enumerated()), id: \.offset) { _, detail in
+                        Text(detail)
+                            .font(.system(size: 10.5))
+                            .foregroundStyle(.primary)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 1)
+                            .background(Theme.hoverFill, in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+                    }
+                }
+                .padding(.top, 7)
+            }
+            if e.verdict == .normal {
+                Divider().overlay(Theme.divider).padding(.top, 7)
+                Text("\(e.inputTag.rawValue) 판정이었지만 AI는 정상으로 봤어요")
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(.tertiary)
+                    .padding(.top, 6)
+            }
+        }
+        .padding(EdgeInsets(top: 9, leading: 10, bottom: 10, trailing: 10))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .modifier(InsetCard())
+    }
+
+    private func statusLine(@ViewBuilder icon: () -> some View, text: () -> String) -> some View {
+        HStack(spacing: 6) {
+            icon()
+            Text(text())
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .modifier(InsetCard())
+    }
+}
+
+private struct InsetCard: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .background(Theme.insetFill, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Theme.divider))
+    }
+}
+
+/// AI 설명 결론 알약: 정상 = 초록, 관심 필요 = 주의색, 종료 추천 = 위험색
+private struct VerdictPill: View {
+    let verdict: VerdictChoice
+
+    private var color: Color {
+        switch verdict {
+        case .normal: Theme.ok
+        case .attention: Theme.warn
+        case .terminate: Theme.danger
+        }
+    }
+
+    var body: some View {
+        Text(verdict.rawValue)
+            .font(.system(size: 10.5, weight: .semibold))
+            .foregroundStyle(color)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 1)
+            .background(color.opacity(Theme.badgeFillOpacity), in: Capsule())
+            .fixedSize()
+    }
+}
+
+/// 칩을 가로로 채우다 넘치면 다음 줄로 넘긴다.
+private struct ChipFlow: Layout {
+    var spacing: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let rows = arrange(width: proposal.width ?? .infinity, subviews: subviews)
+        let height = rows.map(\.height).reduce(0, +) + spacing * CGFloat(max(rows.count - 1, 0))
+        let width = rows.map(\.width).max() ?? 0
+        return CGSize(width: proposal.width ?? width, height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var y = bounds.minY
+        for row in arrange(width: bounds.width, subviews: subviews) {
+            var x = bounds.minX
+            for index in row.indices {
+                let size = subviews[index].sizeThatFits(.init(width: bounds.width, height: nil))
+                subviews[index].place(at: CGPoint(x: x, y: y), proposal: .init(size))
+                x += size.width + spacing
+            }
+            y += row.height + spacing
+        }
+    }
+
+    private struct Row { var indices: [Int] = []; var width: CGFloat = 0; var height: CGFloat = 0 }
+
+    private func arrange(width: CGFloat, subviews: Subviews) -> [Row] {
+        var rows: [Row] = []
+        var current = Row()
+        for index in subviews.indices {
+            let size = subviews[index].sizeThatFits(.init(width: width, height: nil))
+            let needed = current.indices.isEmpty ? size.width : current.width + spacing + size.width
+            if needed > width, !current.indices.isEmpty {
+                rows.append(current)
+                current = Row()
+            }
+            current.width = current.indices.isEmpty ? size.width : current.width + spacing + size.width
+            current.height = max(current.height, size.height)
+            current.indices.append(index)
+        }
+        if !current.indices.isEmpty { rows.append(current) }
+        return rows
     }
 }
 

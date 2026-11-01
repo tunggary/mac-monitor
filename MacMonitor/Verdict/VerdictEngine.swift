@@ -4,6 +4,8 @@ import Foundation
 enum VerdictMode: String, Sendable, Equatable, Codable {
     case full
     case dataLossOnly
+    /// AI 설명 (LLM 이 명령으로 조사)
+    case explain
 }
 
 /// 엔진이 고른 판정. 정상은 태그 없음.

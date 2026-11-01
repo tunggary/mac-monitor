@@ -20,6 +20,7 @@ struct SettingsView: View {
                 ThresholdSection(model: model)
                 NotificationSection(model: model)
                 AIVerdictSection(model: model, openAuditLog: openAuditLog)
+                AIExplainSection(model: model)
                 CharacterSection()
             }
             .padding(.horizontal, 24)

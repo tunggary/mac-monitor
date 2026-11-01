@@ -198,7 +198,7 @@ final class StatusItemController: NSObject {
         }))
         controller.sizingOptions = [.preferredContentSize]
         controller.view.layoutSubtreeIfNeeded()
-        controller.onSizeChange = { [weak self] size in self?.resizePanel(to: size, animate: true) }
+        controller.onSizeChange = { [weak self] size in self?.resizePanel(to: size) }
 
         let panel = PopoverPanel(
             contentRect: NSRect(origin: .zero, size: controller.view.fittingSize),
@@ -220,7 +220,7 @@ final class StatusItemController: NSObject {
 
         self.panel = panel
         hosting = controller
-        resizePanel(to: controller.view.fittingSize, animate: false)
+        resizePanel(to: controller.view.fittingSize)
         button.highlight(true)
         panel.makeKeyAndOrderFront(nil)
         installDismissMonitors()
@@ -228,7 +228,7 @@ final class StatusItemController: NSObject {
     }
 
     /// 상태 아이템 아래 중앙, 화면 밖이면 안으로. 높이가 바뀌어도 위쪽을 고정한다.
-    private func resizePanel(to size: NSSize, animate: Bool) {
+    private func resizePanel(to size: NSSize) {
         guard let panel, let button = statusItem.button, let buttonWindow = button.window,
               size.width > 0, size.height > 0 else { return }
         let buttonFrame = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
@@ -237,7 +237,7 @@ final class StatusItemController: NSObject {
         var x = buttonFrame.midX - size.width / 2
         x = min(x, visible.maxX - Self.screenMargin - size.width)
         x = max(x, visible.minX + Self.screenMargin)
-        panel.setFrame(NSRect(x: x, y: top - size.height, width: size.width, height: size.height), display: true, animate: animate && panel.isVisible)
+        panel.setFrame(NSRect(x: x, y: top - size.height, width: size.width, height: size.height), display: true)
     }
 
     private func statusButtonFrame() -> NSRect {
