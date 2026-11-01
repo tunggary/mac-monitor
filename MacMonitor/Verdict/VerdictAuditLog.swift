@@ -22,6 +22,8 @@ struct VerdictAuditEntry: Codable, Sendable, Equatable, Identifiable {
     var result: String
     var confidence: Double?
     var error: String?
+    /// AI 설명에서 LLM 이 실행한 명령. 이전 기록에는 없다.
+    var commands: [String]?
 
     var isSkipped: Bool { result == Self.skippedRateLimit }
     var isFailure: Bool { error != nil }
@@ -38,6 +40,32 @@ struct AuditMonthSummary: Sendable, Equatable {
 actor VerdictAuditLog {
     /// 입력 $0.042 / 1M 토큰 (출력은 무료)
     static let usdPerInputToken = 0.042 / 1_000_000
+
+    /// 엔진별 단가 (USD / 토큰)
+    struct Rate: Equatable {
+        var input: Double
+        var output: Double
+    }
+
+    static let jevRate = Rate(input: usdPerInputToken, output: 0)
+    /// Claude Opus 5.5: 입력 $4 / 1M, 출력 $20 / 1M
+    /// claude-haiku-5-5 (프롬프트 100K 토큰 이하 기준)
+    static let claudeRate = Rate(input: 0.10 / 1_000_000, output: 0.50 / 1_000_000)
+    /// gpt-6-luna (입력 272K 토큰 이하 기준)
+    static let openAIRate = Rate(input: 0.10 / 1_000_000, output: 0.50 / 1_000_000)
+
+    static func rate(engineID: String) -> Rate {
+        switch engineID {
+        case "claude": claudeRate
+        case "openai": openAIRate
+        default: jevRate
+        }
+    }
+
+    static func estimatedCost(_ entry: VerdictAuditEntry) -> Double {
+        let r = rate(engineID: entry.engineID)
+        return Double(entry.inputTokens) * r.input + Double(entry.outputTokens) * r.output
+    }
     static let retentionDays = 30
     static let maxBytes = 5 * 1024 * 1024
 
@@ -102,7 +130,7 @@ actor VerdictAuditLog {
         let tokens = month.reduce(0) { $0 + $1.inputTokens }
         return AuditMonthSummary(
             calls: month.count, inputTokens: tokens,
-            estimatedCostUSD: Double(tokens) * Self.usdPerInputToken,
+            estimatedCostUSD: month.reduce(0) { $0 + Self.estimatedCost($1) },
             failures: month.filter(\.isFailure).count
         )
     }

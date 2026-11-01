@@ -18,6 +18,11 @@ enum AuditFormat {
         return e.isFailure ? "실패" : "성공"
     }
 
+    /// 기록 줄의 엔진 표기. AI 설명 호출이면 "claude · 설명".
+    static func engineLabel(_ e: VerdictAuditEntry) -> String {
+        e.mode == .explain ? "\(e.engineID) · 설명" : e.engineID
+    }
+
     /// JSON 이면 보기 좋게 들여 쓰고, 아니면 원문 그대로.
     static func pretty(_ body: String?) -> String {
         guard let body, !body.isEmpty else { return "(없음)" }

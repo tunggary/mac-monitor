@@ -91,6 +91,33 @@ struct VerdictAuditLogTests {
         let text = String(decoding: data, as: UTF8.self).lowercased()
         #expect(!text.contains("authorization") && !text.contains("apikey") && !text.contains("bearer"))
     }
+
+    @Test func costUsesPerEngineRates() async {
+        let l = log()
+        var jev = entry(t0, tokens: 1_000_000)
+        jev.outputTokens = 1_000_000
+        var claude = entry(t0 + 1, tokens: 1_000_000)
+        claude.engineID = "claude"
+        claude.outputTokens = 1_000_000
+        await l.append(jev)
+        await l.append(claude)
+        let cost = await l.monthSummary(at: t0, calendar: Calendar(identifier: .gregorian)).estimatedCostUSD
+        // jev 0.042 (출력 무료) + claude 0.10 + 0.50
+        #expect(abs(cost - 0.642) < 1e-9)
+    }
+
+    @Test func explainEntryLabelAndCommandsRoundTrip() async {
+        let l = log()
+        var e = entry(t0)
+        e.engineID = "claude"
+        e.mode = .explain
+        e.commands = ["ps -p 1"]
+        await l.append(e)
+        let read = await l.recent(limit: 1)
+        #expect(read.first?.commands == ["ps -p 1"])
+        #expect(AuditFormat.engineLabel(e) == "claude · 설명")
+        #expect(AuditFormat.engineLabel(entry(t0)) == "jev")
+    }
 }
 
 struct MemoryKeyStoreTests {
